@@ -2,1205 +2,557 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ExamSync — Personalized Exam Timetable Generator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ExamSync Studio — Personalized Exam Timetable JPG Generator</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
-  <!-- Tesseract.js for Client-Side OCR -->
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-  <!-- PDF.js for Client-Side PDF Parsing -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-  <!-- html2canvas for High-Resolution JPG Export -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <!-- SheetJS (xlsx) for Excel/CSV Parsing -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet" />
+  <!-- PDF.js (cdnjs) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+  <!-- Tesseract.js (jsdelivr) -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
+  <!-- SheetJS / XLSX (cdnjs) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 
   <script>
     tailwind.config = {
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Inter', 'system-ui', 'sans-serif'],
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
             mono: ['JetBrains Mono', 'monospace'],
           },
         },
       },
     };
   </script>
-  <style>
-    /* Custom thin scrollbars only inside isolated sub-panels */
-    .thin-scroll::-webkit-scrollbar {
-      width: 5px;
-      height: 5px;
-    }
-    .thin-scroll::-webkit-scrollbar-track {
-      background: transparent;
-    }
-    .thin-scroll::-webkit-scrollbar-thumb {
-      background: rgba(148, 163, 184, 0.45);
-      border-radius: 9999px;
-    }
-    .thin-scroll::-webkit-scrollbar-thumb:hover {
-      background: rgba(100, 116, 139, 0.7);
-    }
-  </style>
 </head>
-<body class="bg-slate-100 text-slate-900 font-sans antialiased selection:bg-emerald-100 selection:text-emerald-900 lg:h-[100dvh] lg:overflow-hidden flex flex-col">
+<body class="h-[100dvh] w-screen overflow-hidden flex flex-col bg-slate-100 text-slate-900 font-sans antialiased select-none">
 
-  <!-- Toast / Status Notification Banner -->
-  <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
-
-  <!-- Compact Top Navigation Header (Fixed Height) -->
-  <header class="bg-white border-b border-slate-200 shrink-0 z-30">
-    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
-      <!-- Brand -->
-      <div class="flex items-center gap-2.5 min-w-0">
-        <div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-xs shrink-0">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-            <rect x="3" y="4" width="18" height="18" rx="3" ry="3"></rect>
-            <line x1="16" y1="2" x2="16" y2="6"></line>
-            <line x1="8" y1="2" x2="8" y2="6"></line>
-            <line x1="3" y1="10" x2="21" y2="10"></line>
-            <path d="M9 16l2 2 4-4"></path>
+  <!-- TOP NAVIGATION BAR (pl-14 on mobile prevents top-left WebView close button overlap) -->
+  <header class="bg-white border-b border-slate-200 pt-2 pb-2 px-3 pl-14 lg:pl-4 shrink-0 shadow-2xs z-30">
+    <div class="max-w-[1680px] mx-auto flex items-center justify-between gap-2">
+      <!-- Brand Title (Hidden on tiny screens to give buttons full room, visible sm+) -->
+      <div class="hidden sm:flex items-center gap-2.5 min-w-0">
+        <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-2xs shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="18" rx="3" />
+            <path d="M16 2v4M8 2v4M3 10h18M9 15l2 2 4-4" />
           </svg>
         </div>
-        <div class="truncate">
-          <div class="flex items-center gap-2">
-            <h1 class="text-sm sm:text-base font-extrabold tracking-tight text-slate-900 truncate">ExamSync <span class="text-emerald-600">Studio</span></h1>
-            <span class="hidden md:inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-              Course-Code Only • Repeats Preserved
-            </span>
-          </div>
+        <div class="min-w-0">
+          <h1 class="text-lg font-extrabold tracking-tight text-slate-900 leading-tight">ExamSync Studio</h1>
+          <p class="text-xs font-semibold text-slate-500">Course-Code Only &bull; JPG Generator</p>
         </div>
       </div>
 
-      <!-- Global Quick Actions & Primary Download CTA -->
-      <div class="flex items-center gap-2 shrink-0">
-        <button id="btn-load-both-samples" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition cursor-pointer">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-          <span class="hidden sm:inline">Instant Demo</span>
-          <span class="sm:hidden">Demo</span>
-        </button>
-
-        <button id="btn-reset-all" type="button" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 border border-slate-200 transition cursor-pointer">
-          Reset
-        </button>
-
-        <button id="btn-download-jpg" type="button" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 shadow-xs transition cursor-pointer">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
+      <!-- Action Buttons -->
+      <div class="flex items-center justify-end gap-2 w-full sm:w-auto">
+        <button
+          id="btnInstantDemo"
+          type="button"
+          class="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-[0.98] text-white font-extrabold text-sm sm:text-base shadow-2xs transition flex items-center gap-1.5 cursor-pointer shrink-0"
+        >
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
-          Download .JPG
+          <span>Instant Demo</span>
+        </button>
+
+        <button
+          id="btnResetAll"
+          type="button"
+          class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-800 font-bold text-sm sm:text-base border border-slate-300 transition cursor-pointer shrink-0"
+        >
+          Clear
+        </button>
+
+        <button
+          id="btnHeaderDownloadJpg"
+          type="button"
+          class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-extrabold text-sm sm:text-base shadow-sm transition flex items-center gap-1.5 cursor-pointer shrink-0"
+        >
+          <svg class="w-4 h-4 sm:w-5 sm:h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span>Download JPG</span>
         </button>
       </div>
-    </div>
-
-    <!-- Mobile-Only Top Switcher Bar (Inputs vs Live Preview) -->
-    <div class="lg:hidden grid grid-cols-2 border-t border-slate-200 bg-slate-50 text-xs font-bold">
-      <button type="button" id="mobile-view-inputs" class="py-2.5 text-center border-b-2 border-emerald-600 text-emerald-700 bg-white cursor-pointer">
-        1. Upload Inputs (<span id="mobile-code-badge">0</span>)
-      </button>
-      <button type="button" id="mobile-view-preview" class="py-2.5 text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800 cursor-pointer">
-        2. Live JPG Preview (<span id="mobile-exam-badge">0</span>)
-      </button>
     </div>
   </header>
 
-  <!-- Zero-Scroll Split Workspace (Fills Remaining Viewport Height on Desktop) -->
-  <main class="flex-1 min-h-0 max-w-[1600px] w-full mx-auto grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
+  <!-- MOBILE 2-TAB SWITCHER (< 1024px) -->
+  <nav class="lg:hidden bg-white border-b border-slate-200 px-3 py-2 shrink-0" aria-label="Workspace View Switcher">
+    <div class="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl border border-slate-200">
+      <button
+        id="tabBtnSetup"
+        type="button"
+        class="py-2 px-3 rounded-lg font-extrabold text-sm sm:text-base transition flex items-center justify-center gap-1.5 bg-white text-indigo-700 shadow-2xs cursor-pointer"
+      >
+        <span>1. Upload &amp; Courses</span>
+        <span id="tabCodesBadge" class="px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-800 font-mono text-xs">0</span>
+      </button>
+      <button
+        id="tabBtnPreview"
+        type="button"
+        class="py-2 px-3 rounded-lg font-extrabold text-sm sm:text-base transition flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900 cursor-pointer"
+      >
+        <span>2. JPG Preview</span>
+        <span id="tabExamsBadge" class="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-mono text-xs">0</span>
+      </button>
+    </div>
+  </nav>
 
-    <!-- ===================================================================== -->
-    <!-- LEFT PANEL (42% / 5 cols): COMPACT TABBED INPUT WORKSPACE             -->
-    <!-- ===================================================================== -->
-    <aside id="left-input-panel" class="lg:col-span-5 bg-white border-r border-slate-200 flex flex-col min-h-[calc(100dvh-6.25rem)] lg:min-h-0 lg:h-full overflow-hidden">
+  <!-- MAIN SINGLE-SCREEN WORKSPACE (flex-1 min-h-0 overflow-hidden) -->
+  <main class="flex-1 min-h-0 max-w-[1680px] w-full mx-auto p-2.5 sm:p-3 overflow-hidden">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 h-full min-h-0 overflow-hidden">
 
-      <!-- Step Tabs Header -->
-      <div class="grid grid-cols-2 border-b border-slate-200 bg-slate-50/80 p-1.5 gap-1.5 shrink-0">
-        <button type="button" id="tab-btn-slip" class="flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold bg-white text-slate-900 shadow-2xs border border-slate-200/80 transition cursor-pointer">
-          <span class="w-4 h-4 rounded-full bg-emerald-600 text-white text-[10px] flex items-center justify-center font-extrabold">1</span>
-          <span>Exam Slip</span>
-          <span id="tab-slip-count" class="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-emerald-100 text-emerald-800">0</span>
-        </button>
+      <!-- LEFT PANEL: STEP 1 & STEP 2 (Visible on mobile when Setup tab active; always visible on desktop) -->
+      <div id="leftSetupPanel" class="lg:col-span-5 flex flex-col gap-2.5 h-full min-h-0 overflow-hidden">
 
-        <button type="button" id="tab-btn-timetable" class="flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-white/60 transition cursor-pointer">
-          <span class="w-4 h-4 rounded-full bg-slate-300 text-slate-700 text-[10px] flex items-center justify-center font-extrabold" id="tab-tt-num">2</span>
-          <span>General Timetable</span>
-          <span id="tab-tt-count" class="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-slate-200 text-slate-700">0</span>
-        </button>
-      </div>
-
-      <!-- TAB 1 CONTENT: EXAM SLIP UPLOADER & COURSE CODE CHIPS -->
-      <div id="tab-panel-slip" class="flex-1 min-h-0 flex flex-col p-4 sm:p-5 gap-3.5 overflow-y-auto thin-scroll">
-        <div class="flex items-center justify-between gap-2 shrink-0">
-          <div>
-            <h2 class="text-sm font-bold text-slate-900">Registered Courses (Code Only)</h2>
-            <p class="text-[11px] text-slate-500">Upload exam slip screenshot/PDF or paste codes.</p>
-          </div>
-          <button id="btn-sample-slip" type="button" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition shrink-0 cursor-pointer">
-            Load Sample Slip
-          </button>
-        </div>
-
-        <!-- Compact Dropzone -->
-        <label for="slip-file-input" id="slip-dropzone" class="shrink-0 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-xl p-3.5 text-center cursor-pointer transition bg-slate-50/70 hover:bg-emerald-50/40 flex items-center justify-center gap-3">
-          <input id="slip-file-input" type="file" accept="image/*,.pdf,.txt,.csv" class="hidden" />
-          <div class="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-emerald-600 shrink-0 shadow-2xs">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="17 8 12 3 7 8"></polyline>
-              <line x1="12" y1="3" x2="12" y2="15"></line>
-            </svg>
-          </div>
-          <div class="text-left">
-            <p class="text-xs font-semibold text-slate-800">Drop Exam Slip (JPG, PNG, PDF)</p>
-            <p class="text-[10px] text-slate-500">Auto-extracts codes & advances to Step 2</p>
-          </div>
-        </label>
-
-        <!-- OCR Progress Bar -->
-        <div id="slip-progress-wrap" class="hidden shrink-0 space-y-1 bg-emerald-50 border border-emerald-200 rounded-lg p-2.5">
-          <div class="flex items-center justify-between text-[11px] font-semibold text-emerald-800">
-            <span id="slip-progress-label">Scanning exam slip...</span>
-            <span id="slip-progress-pct">0%</span>
-          </div>
-          <div class="w-full bg-emerald-200 rounded-full h-1.5 overflow-hidden">
-            <div id="slip-progress-bar" class="bg-emerald-600 h-1.5 rounded-full transition-all duration-200" style="width: 0%"></div>
-          </div>
-        </div>
-
-        <!-- Inline Quick Add Input -->
-        <div class="shrink-0 flex gap-1.5">
-          <input id="manual-code-input" type="text" placeholder="+ Add codes (e.g. CIT206, GST201, MTH102)" class="flex-1 min-w-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-mono uppercase focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" />
-          <button id="btn-add-code" type="button" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition shrink-0 cursor-pointer">
-            Add
-          </button>
-        </div>
-
-        <!-- Extracted Course Code Chips Area (Flex-1 fills remaining space neatly) -->
-        <div class="flex-1 min-h-[110px] flex flex-col">
-          <div class="flex items-center justify-between mb-1.5">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Extracted Codes (<span id="code-count">0</span>)</span>
-            <button id="btn-clear-codes" type="button" class="text-[11px] font-medium text-rose-600 hover:underline cursor-pointer">Clear all</button>
-          </div>
-          <div id="course-pills-container" class="flex-1 overflow-y-auto thin-scroll p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap content-start gap-1.5">
-            <p class="text-xs text-slate-400 italic">No course codes yet. Upload your exam slip or click "Load Sample Slip".</p>
-          </div>
-        </div>
-
-        <!-- Bottom Step Action -->
-        <div class="shrink-0 pt-2 border-t border-slate-100 flex items-center justify-between">
-          <span class="text-[11px] text-slate-400">Course titles are automatically ignored</span>
-          <button type="button" id="btn-next-to-timetable" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition cursor-pointer">
-            Next: General Timetable →
-          </button>
-        </div>
-      </div>
-
-      <!-- TAB 2 CONTENT: GENERAL TIMETABLE UPLOADER & PARSER -->
-      <div id="tab-panel-timetable" class="hidden flex-1 min-h-0 flex flex-col p-4 sm:p-5 gap-3.5 overflow-y-auto thin-scroll">
-        <div class="flex items-center justify-between gap-2 shrink-0">
-          <div>
-            <h2 class="text-sm font-bold text-slate-900">School General Timetable</h2>
-            <p class="text-[11px] text-slate-500">Upload PDF, CSV/XLSX, Image, or paste raw rows.</p>
-          </div>
-          <button id="btn-sample-timetable" type="button" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition shrink-0 cursor-pointer">
-            Load Sample Timetable
-          </button>
-        </div>
-
-        <!-- Compact Dropzone -->
-        <label for="tt-file-input" id="tt-dropzone" class="shrink-0 border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-xl p-3.5 text-center cursor-pointer transition bg-slate-50/70 hover:bg-indigo-50/40 flex items-center justify-center gap-3">
-          <input id="tt-file-input" type="file" accept=".pdf,.csv,.xlsx,.xls,.txt,image/*" class="hidden" />
-          <div class="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-indigo-600 shrink-0 shadow-2xs">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-            </svg>
-          </div>
-          <div class="text-left">
-            <p class="text-xs font-semibold text-slate-800">Drop General Timetable (PDF, CSV, XLSX, IMG)</p>
-            <p class="text-[10px] text-slate-500">Auto-matches your slip & preserves repeated courses</p>
-          </div>
-        </label>
-
-        <!-- Parsing Progress Bar -->
-        <div id="tt-progress-wrap" class="hidden shrink-0 space-y-1 bg-indigo-50 border border-indigo-200 rounded-lg p-2.5">
-          <div class="flex items-center justify-between text-[11px] font-semibold text-indigo-800">
-            <span id="tt-progress-label">Parsing general timetable...</span>
-            <span id="tt-progress-pct">0%</span>
-          </div>
-          <div class="w-full bg-indigo-200 rounded-full h-1.5 overflow-hidden">
-            <div id="tt-progress-bar" class="bg-indigo-600 h-1.5 rounded-full transition-all duration-200" style="width: 0%"></div>
-          </div>
-        </div>
-
-        <!-- Compact Raw Timetable Paste Box (Flex-1 fills remaining vertical space) -->
-        <div class="flex-1 min-h-[120px] flex flex-col">
-          <div class="flex items-center justify-between mb-1.5">
-            <label for="raw-timetable-text" class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Timetable Data</label>
-            <span id="parsed-slots-badge" class="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">0 slots parsed</span>
-          </div>
-          <textarea id="raw-timetable-text" placeholder="Paste timetable rows or upload file above...&#10;Thursday, 26th November, 2026 | 8:30am | CIT206 | CBT Hall A&#10;Saturday, 21st November, 2026 | 11:00am | GST201 | CBT Hall A" class="flex-1 w-full rounded-xl border border-slate-300 p-2.5 text-[11px] font-mono leading-relaxed resize-none thin-scroll focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
-        </div>
-
-        <!-- Bottom Action Bar -->
-        <div class="shrink-0 pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-          <button type="button" id="btn-back-to-slip" class="px-3 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer">
-            ← Back
-          </button>
-          <button id="btn-generate" type="button" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 shadow-xs transition cursor-pointer">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-            Refresh Preview
-          </button>
-        </div>
-      </div>
-
-    </aside>
-
-    <!-- ===================================================================== -->
-    <!-- RIGHT PANEL (58% / 7 cols): STICKY LIVE JPG TIMETABLE STUDIO          -->
-    <!-- ===================================================================== -->
-    <section id="right-preview-panel" class="hidden lg:flex lg:col-span-7 bg-slate-100/90 flex-col min-h-[calc(100dvh-6.25rem)] lg:min-h-0 lg:h-full overflow-hidden">
-
-      <!-- Sleek Single-Row Studio Toolbar Strip -->
-      <div class="bg-white border-b border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 shrink-0">
-        <!-- Theme Switcher -->
-        <div class="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-          <button type="button" data-theme="classic" class="theme-btn px-2 py-1 rounded-md text-[11px] font-bold bg-white text-slate-900 shadow-2xs cursor-pointer">Light</button>
-          <button type="button" data-theme="navy" class="theme-btn px-2 py-1 rounded-md text-[11px] font-medium text-slate-600 hover:text-slate-900 cursor-pointer">Navy</button>
-          <button type="button" data-theme="emerald" class="theme-btn px-2 py-1 rounded-md text-[11px] font-medium text-slate-600 hover:text-slate-900 cursor-pointer">NOUN Green</button>
-        </div>
-
-        <!-- Compact Heading / Subtitle Quick Inputs -->
-        <div class="flex items-center gap-1.5 flex-1 min-w-[200px] max-w-md">
-          <input id="export-title-input" type="text" value="PERSONALIZED EXAM TIMETABLE" title="Edit Timetable Heading" class="w-1/2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500" />
-          <input id="export-subtitle-input" type="text" value="2026_2 Examination • Course Code Schedule" title="Edit Subtitle" class="w-1/2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] text-slate-600 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500" />
-        </div>
-
-        <!-- Venue Toggle & Add Row -->
-        <div class="flex items-center gap-2">
-          <label class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-700 cursor-pointer select-none bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
-            <input id="toggle-venue-col" type="checkbox" checked class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
-            <span>Venue</span>
-          </label>
-          <button id="btn-add-row-modal" type="button" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-900 text-white hover:bg-slate-800 transition cursor-pointer">
-            + Row
-          </button>
-        </div>
-      </div>
-
-      <!-- Compact Inline Alerts (Only appear if needed) -->
-      <div id="alerts-strip" class="px-4 pt-2.5 space-y-1.5 shrink-0 empty:hidden">
-        <div id="unmatched-alert" class="hidden rounded-lg bg-amber-50 border border-amber-200 px-3 py-1.5 text-[11px] text-amber-900 flex items-center justify-between gap-2">
-          <span><strong>Not in General Timetable:</strong> <span id="unmatched-list" class="font-mono font-bold"></span></span>
-        </div>
-        <div id="clash-alert" class="hidden rounded-lg bg-rose-50 border border-rose-200 px-3 py-1.5 text-[11px] text-rose-900 flex items-center gap-2">
-          <span><strong>Time Clash Detected:</strong> Two or more exams share the exact same date and session.</span>
-        </div>
-      </div>
-
-      <!-- Isolated Scrollable Canvas Stage (No outer page scroll) -->
-      <div class="flex-1 min-h-0 overflow-auto thin-scroll p-4 sm:p-5 flex items-start justify-center">
-        <div id="timetable-export-card" class="w-full max-w-3xl rounded-xl border border-slate-300 bg-white text-slate-900 overflow-hidden shadow-md transition-colors duration-200">
-          
-          <!-- Card Header -->
-          <div id="card-header-band" class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between gap-3">
-            <div class="min-w-0">
-              <h3 id="render-title" class="text-sm sm:text-base font-extrabold tracking-tight uppercase truncate">PERSONALIZED EXAM TIMETABLE</h3>
-              <p id="render-subtitle" class="text-[11px] opacity-85 truncate">2026_2 Examination • Course Code Schedule</p>
+        <!-- CARD 1: Step 1 — Registered Courses (Code Only) -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-2xs p-3 sm:p-3.5 flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div class="flex items-center justify-between gap-2 mb-2 shrink-0">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-lg text-xs font-extrabold bg-indigo-100 text-indigo-800 uppercase">Step 1</span>
+              <h2 class="text-base sm:text-lg font-extrabold text-slate-900">Registered Courses</h2>
             </div>
-            <span id="render-badge" class="shrink-0 px-2.5 py-1 rounded-md text-[11px] font-bold bg-white/15">
-              0 Exams
+            <div class="flex items-center gap-2.5 shrink-0">
+              <button
+                id="btnLoadSampleSlip"
+                type="button"
+                class="text-sm font-bold text-indigo-600 hover:text-indigo-800 underline underline-offset-2 cursor-pointer"
+              >
+                Sample Slip
+              </button>
+              <button
+                id="btnClearCodes"
+                type="button"
+                class="text-sm font-bold text-rose-600 hover:text-rose-800 cursor-pointer hidden"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <!-- Native Label Wrapping File Input for 100% iOS/Android & Desktop Tap Support -->
+          <label
+            id="slipDropzone"
+            for="slipFileInput"
+            class="flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl border-2 border-dashed border-indigo-300 bg-indigo-50/60 active:bg-indigo-100 hover:bg-indigo-50 hover:border-indigo-500 transition cursor-pointer shrink-0"
+          >
+            <div class="flex items-center gap-2.5 min-w-0">
+              <div class="w-9 h-9 rounded-xl bg-white text-indigo-600 shadow-2xs flex items-center justify-center shrink-0">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <p class="text-sm sm:text-base font-extrabold text-slate-900">Upload Exam Slip (Image or PDF)</p>
+                <p class="text-xs text-slate-600">Extracts course codes &amp; ignores titles</p>
+              </div>
+            </div>
+            <span class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-sm font-bold shrink-0">Browse</span>
+            <input
+              id="slipFileInput"
+              type="file"
+              accept="image/*,.pdf,application/pdf"
+              class="sr-only"
+            />
+          </label>
+
+          <!-- Progress Bar for Exam Slip -->
+          <div id="slipProgressContainer" class="hidden mt-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 shrink-0">
+            <div class="flex items-center justify-between text-xs font-bold text-slate-700 mb-1">
+              <span id="slipProgressText">Scanning exam slip...</span>
+              <span id="slipProgressPercent" class="font-mono text-indigo-700 ml-2">0%</span>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+              <div id="slipProgressBar" class="bg-indigo-600 h-1.5 rounded-full transition-all duration-200" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Manual Course Code Input (16px font prevents iOS Safari auto-zoom) -->
+          <div class="mt-2 flex gap-2 shrink-0">
+            <input
+              id="manualCodeInput"
+              type="text"
+              placeholder="Type or paste codes: CIT206, GST201..."
+              class="flex-1 min-w-0 px-3 py-2 rounded-xl border border-slate-300 text-base font-mono uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white select-text"
+            />
+            <button
+              id="btnAddManualCode"
+              type="button"
+              class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white font-extrabold text-base transition cursor-pointer shrink-0"
+            >
+              + Add
+            </button>
+          </div>
+
+          <!-- Extracted Codes Header -->
+          <div class="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between shrink-0">
+            <span class="text-sm font-extrabold text-slate-800">
+              Extracted Codes (<span id="extractedCount" class="text-indigo-600 font-mono">0</span>)
+            </span>
+            <span class="text-xs text-slate-500 font-medium">Titles ignored</span>
+          </div>
+
+          <!-- Internal Scrollable Course Code Pills -->
+          <div id="extractedCodesContainer" class="mt-1.5 flex-1 min-h-0 overflow-y-auto pr-1 flex flex-wrap content-start gap-1.5">
+            <p class="text-sm text-slate-500 italic">
+              No course codes yet. Upload your exam slip or tap "Sample Slip".
+            </p>
+          </div>
+        </section>
+
+        <!-- CARD 2: Step 2 — School General Timetable (Zero Venue Checkbox) -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-2xs p-3 sm:p-3.5 flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div class="flex items-center justify-between gap-2 mb-2 shrink-0">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-lg text-xs font-extrabold bg-emerald-100 text-emerald-800 uppercase">Step 2</span>
+              <h2 class="text-base sm:text-lg font-extrabold text-slate-900">School General Timetable</h2>
+            </div>
+            <button
+              id="btnToggleRawPaste"
+              type="button"
+              class="text-sm font-bold text-indigo-600 hover:text-indigo-800 underline underline-offset-2 cursor-pointer shrink-0"
+            >
+              Paste Rows
+            </button>
+          </div>
+
+          <!-- Native Label Wrapping File Input for General Timetable -->
+          <label
+            id="timetableDropzone"
+            for="timetableFileInput"
+            class="flex items-center justify-between gap-2.5 px-3 py-2.5 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50/60 active:bg-emerald-100 hover:bg-emerald-50 hover:border-emerald-500 transition cursor-pointer shrink-0"
+          >
+            <div class="flex items-center gap-2.5 min-w-0">
+              <div class="w-9 h-9 rounded-xl bg-white text-emerald-600 shadow-2xs flex items-center justify-center shrink-0">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div class="min-w-0">
+                <p class="text-sm sm:text-base font-extrabold text-slate-900">Upload General Timetable</p>
+                <p class="text-xs text-slate-600">PDF, CSV, Excel, or Image &bull; Preserves repeats</p>
+              </div>
+            </div>
+            <span class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-bold shrink-0">Browse</span>
+            <input
+              id="timetableFileInput"
+              type="file"
+              accept=".pdf,application/pdf,.csv,.xlsx,.xls,image/*,.txt"
+              class="sr-only"
+            />
+          </label>
+
+          <!-- Timetable Progress Bar -->
+          <div id="timetableProgressContainer" class="hidden mt-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 shrink-0">
+            <div class="flex items-center justify-between text-xs font-bold text-slate-700 mb-1">
+              <span id="timetableProgressText">Parsing general timetable...</span>
+              <span id="timetableProgressPercent" class="font-mono text-emerald-700 ml-2">0%</span>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+              <div id="timetableProgressBar" class="bg-emerald-600 h-1.5 rounded-full transition-all duration-200" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Status Badges & Alerts -->
+          <div class="mt-2 flex flex-wrap items-center gap-1.5 shrink-0">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-sm font-bold text-slate-800">
+              <span id="parsedSlotsCount" class="text-emerald-700 font-mono">0</span> slots parsed
+            </span>
+
+            <span id="missingCoursesAlert" class="hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-300 text-amber-900 text-xs font-bold">
+              <span>Not found:</span>
+              <span id="missingCoursesList" class="font-mono"></span>
+            </span>
+
+            <span id="clashAlert" class="hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-300 text-rose-900 text-xs font-bold">
+              <span>Time Clash Detected</span>
             </span>
           </div>
 
-          <!-- Compact High-Density Table -->
-          <div class="overflow-x-auto">
+          <!-- Mobile Quick-Jump CTA when exams are matched -->
+          <button
+            id="btnMobileViewPreview"
+            type="button"
+            class="lg:hidden hidden mt-auto w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-extrabold text-base shadow-sm flex items-center justify-center gap-2 cursor-pointer shrink-0"
+          >
+            <span id="btnMobileViewPreviewLabel">View Personalized Timetable</span>
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </button>
+
+          <!-- Collapsible / Internal Scroll Area for Raw Text Paste -->
+          <div id="rawPasteBox" class="hidden mt-2 flex-1 min-h-0 flex flex-col gap-1.5 overflow-hidden">
+            <textarea
+              id="rawTimetableTextarea"
+              placeholder="Paste rows e.g. Wednesday, 18th November, 2026 | 2:00pm | CIT213"
+              class="flex-1 min-h-0 w-full p-2.5 rounded-xl border border-slate-300 text-base font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none select-text"
+            ></textarea>
+            <button
+              id="btnParseRawText"
+              type="button"
+              class="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm sm:text-base transition cursor-pointer shrink-0"
+            >
+              Parse Pasted Rows
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <!-- RIGHT PANEL: LIVE JPG PREVIEW (Hidden on mobile until Preview tab active; always visible on desktop) -->
+      <div id="rightPreviewPanel" class="hidden lg:flex lg:col-span-7 flex-col h-full min-h-0 overflow-hidden">
+        <div id="timetablePreviewCard" class="bg-white rounded-2xl border-2 border-slate-300 shadow-sm flex flex-col flex-1 min-h-0 overflow-hidden">
+
+          <!-- Pinned Dark Navy Preview Header -->
+          <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white px-3.5 sm:px-5 py-3 shrink-0">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex-1 min-w-0">
+                <input
+                  id="scheduleTitleInput"
+                  type="text"
+                  value="PERSONALIZED EXAM TIMETABLE"
+                  aria-label="Timetable Heading"
+                  class="w-full bg-transparent text-base sm:text-xl font-extrabold tracking-tight uppercase text-white focus:outline-none focus:bg-white/10 rounded-lg px-1.5 -ml-1.5 transition select-text"
+                />
+                <input
+                  id="scheduleSubtitleInput"
+                  type="text"
+                  value="2026_2 Examination • Course Code Schedule"
+                  aria-label="Semester Subtitle"
+                  class="w-full bg-transparent text-xs sm:text-sm text-indigo-200 font-medium focus:outline-none focus:bg-white/10 rounded-lg px-1.5 -ml-1.5 transition select-text"
+                />
+              </div>
+
+              <div class="flex items-center gap-2 shrink-0">
+                <button
+                  id="btnAddCustomRow"
+                  type="button"
+                  class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white font-bold text-xs sm:text-sm border border-white/20 transition cursor-pointer"
+                >
+                  + Row
+                </button>
+                <div class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-indigo-500/30 border border-indigo-300/30">
+                  <span id="previewExamCountBadge" class="text-xs sm:text-base font-extrabold text-white">0 Exams</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Internal Scrollable Table Area (Strictly 4 data columns + Edit button; NO Venue column) -->
+          <div class="flex-1 min-h-0 overflow-y-auto overflow-x-auto">
             <table class="w-full text-left border-collapse">
-              <thead>
-                <tr id="card-table-head" class="bg-slate-100 text-slate-700 border-b border-slate-200 text-[10px] font-extrabold uppercase tracking-wider">
-                  <th class="py-2.5 px-3 w-10 text-center">#</th>
-                  <th class="py-2.5 px-3">Day & Date</th>
-                  <th class="py-2.5 px-3 w-28">Session</th>
-                  <th class="py-2.5 px-3 w-36">Course Code</th>
-                  <th class="py-2.5 px-3 venue-col">Venue / Hall</th>
-                  <th class="py-2.5 px-2.5 w-16 text-right no-export">Edit</th>
+              <thead class="sticky top-0 z-10 bg-slate-100 border-b-2 border-slate-200 text-slate-800 shadow-2xs">
+                <tr>
+                  <th class="py-2.5 px-3 text-sm sm:text-base font-extrabold w-10">#</th>
+                  <th class="py-2.5 px-3 text-sm sm:text-base font-extrabold">Day &amp; Date</th>
+                  <th class="py-2.5 px-3 text-sm sm:text-base font-extrabold">Session</th>
+                  <th class="py-2.5 px-3 text-sm sm:text-base font-extrabold">Course Code</th>
+                  <th class="py-2.5 px-3 text-sm sm:text-base font-extrabold text-right w-16">Edit</th>
                 </tr>
               </thead>
-              <tbody id="personalized-tbody" class="divide-y divide-slate-200 text-xs">
+              <tbody id="scheduleTableBody" class="divide-y divide-slate-200 text-base">
                 <tr>
-                  <td colspan="6" class="py-12 px-4 text-center text-slate-400">
-                    <p class="font-medium text-slate-600 mb-1">Your live JPG preview appears here automatically</p>
-                    <p class="text-[11px]">Upload your Exam Slip & General Timetable on the left, or click <strong class="text-emerald-600">Instant Demo</strong> in the top bar.</p>
+                  <td colspan="5" class="py-10 px-4 text-center">
+                    <div class="max-w-md mx-auto space-y-2.5">
+                      <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <p class="text-lg font-extrabold text-slate-900">
+                        Your live JPG preview appears here automatically
+                      </p>
+                      <p class="text-sm sm:text-base text-slate-600">
+                        Upload your Exam Slip &amp; General Timetable, or tap
+                        <strong class="text-amber-600">Instant Demo</strong> in the top bar.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
 
-          <!-- Card Footer -->
-          <div id="card-footer-band" class="px-5 py-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-500">
-            <span>ExamSync • Course-Code Only • Repeated Slots Included</span>
-            <span id="render-generated-date"></span>
+          <!-- Pinned Card Footer with Primary Download JPG Button -->
+          <div class="bg-slate-50 border-t border-slate-200 px-3.5 sm:px-5 py-2.5 shrink-0 flex items-center justify-between gap-2">
+            <div class="text-xs sm:text-sm font-semibold text-slate-600 truncate">
+              <span>Course-Code Only &bull; Repeats Included</span>
+              <span id="previewGeneratedDate" class="hidden sm:inline font-mono text-slate-500 ml-2"></span>
+            </div>
+
+            <button
+              id="btnDownloadJpg"
+              type="button"
+              class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-extrabold text-sm sm:text-base shadow-sm transition flex items-center gap-1.5 cursor-pointer shrink-0"
+            >
+              <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              <span>Download JPG</span>
+            </button>
           </div>
         </div>
       </div>
 
-    </section>
+    </div>
   </main>
 
-  <!-- Modal for Adding/Editing a Schedule Row -->
-  <div id="row-modal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-5 space-y-3.5">
-      <div class="flex items-center justify-between">
-        <h3 id="modal-title" class="text-sm font-bold text-slate-900">Edit Exam Entry</h3>
-        <button id="btn-close-modal" type="button" class="text-slate-400 hover:text-slate-600 cursor-pointer">✕</button>
+  <!-- Edit / Add Exam Entry Modal (Strictly No Venue Field) -->
+  <div id="editModal" class="hidden fixed inset-0 z-50 bg-slate-900/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+        <h3 id="editModalTitle" class="text-xl font-extrabold text-slate-900">Edit Exam Entry</h3>
+        <button id="btnCloseEditModal" type="button" class="p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-900 text-2xl leading-none cursor-pointer">
+          &times;
+        </button>
       </div>
-      <form id="row-form" class="space-y-3">
-        <input type="hidden" id="edit-row-index" value="-1" />
+
+      <form id="editEntryForm" class="space-y-3.5">
+        <input type="hidden" id="editRowIndex" value="-1" />
+
         <div>
-          <label class="block text-[11px] font-bold text-slate-700 mb-1">Course Code *</label>
-          <input id="field-code" type="text" required placeholder="e.g. CIT206" class="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-mono uppercase focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
+          <label for="editDayDate" class="block text-base font-bold text-slate-800 mb-1">Day &amp; Date</label>
+          <input
+            id="editDayDate"
+            type="text"
+            required
+            placeholder="e.g. Friday, 20th November, 2026"
+            class="w-full px-3.5 py-3 rounded-xl border border-slate-300 text-base font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 select-text"
+          />
         </div>
-        <div class="grid grid-cols-2 gap-2.5">
-          <div>
-            <label class="block text-[11px] font-bold text-slate-700 mb-1">Day *</label>
-            <input id="field-day" type="text" required placeholder="e.g. Thursday" class="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
-          </div>
-          <div>
-            <label class="block text-[11px] font-bold text-slate-700 mb-1">Date *</label>
-            <input id="field-date" type="text" required placeholder="e.g. 26th Nov, 2026" class="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
-          </div>
+
+        <div>
+          <label for="editSession" class="block text-base font-bold text-slate-800 mb-1">Session / Time</label>
+          <input
+            id="editSession"
+            type="text"
+            required
+            placeholder="e.g. 8:30am or 11:00am or 2:00pm"
+            class="w-full px-3.5 py-3 rounded-xl border border-slate-300 text-base font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 select-text"
+          />
         </div>
-        <div class="grid grid-cols-2 gap-2.5">
-          <div>
-            <label class="block text-[11px] font-bold text-slate-700 mb-1">Time / Session *</label>
-            <input id="field-time" type="text" required placeholder="e.g. 8:30am" class="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
-          </div>
-          <div>
-            <label class="block text-[11px] font-bold text-slate-700 mb-1">Venue / Hall</label>
-            <input id="field-venue" type="text" placeholder="e.g. CBT Hall A" class="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
-          </div>
+
+        <div>
+          <label for="editCourseCode" class="block text-base font-bold text-slate-800 mb-1">Course Code</label>
+          <input
+            id="editCourseCode"
+            type="text"
+            required
+            placeholder="e.g. CIT210"
+            class="w-full px-3.5 py-3 rounded-xl border border-slate-300 text-base font-mono uppercase font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 select-text"
+          />
         </div>
-        <div class="pt-2 flex justify-end gap-2">
-          <button type="button" id="btn-cancel-modal" class="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer">Cancel</button>
-          <button type="submit" class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 cursor-pointer">Save</button>
+
+        <div class="pt-2 flex items-center justify-between gap-2">
+          <button
+            id="btnDeleteEntry"
+            type="button"
+            class="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-base border border-rose-200 transition cursor-pointer"
+          >
+            Delete
+          </button>
+
+          <div class="flex items-center gap-2 ml-auto">
+            <button
+              id="btnCancelEdit"
+              type="button"
+              class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-base transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-base shadow-sm transition cursor-pointer"
+            >
+              Save
+            </button>
+          </div>
         </div>
       </form>
     </div>
   </div>
 
-  <script>
-    if (window.pdfjsLib) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    }
+  <!-- Bulletproof Mobile & WebView JPG Export Modal -->
+  <div id="jpgExportModal" class="hidden fixed inset-0 z-50 bg-slate-900/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
+    <div class="bg-white rounded-3xl max-w-3xl w-full p-4 sm:p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[92dvh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-slate-200 pb-3 shrink-0">
+        <div>
+          <h3 class="text-xl font-extrabold text-slate-900">Your JPG Timetable is Ready</h3>
+          <p class="text-sm sm:text-base text-slate-600">Tap Share / Save Image or press-and-hold the image below to save to Photos.</p>
+        </div>
+        <button id="btnCloseJpgModal" type="button" class="p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-900 text-2xl leading-none cursor-pointer">
+          &times;
+        </button>
+      </div>
 
-    // =========================================================================
-    // APPLICATION STATE
-    // =========================================================================
+      <div class="overflow-y-auto flex-1 min-h-0 bg-slate-100 rounded-2xl p-3 border border-slate-200 flex items-center justify-center">
+        <img
+          id="exportedJpgPreviewImg"
+          alt="Personalized Exam Timetable JPG"
+          class="max-w-full h-auto rounded-xl shadow-md select-auto"
+        />
+      </div>
+
+      <div class="flex flex-wrap items-center justify-end gap-2.5 pt-1 shrink-0">
+        <button
+          id="btnShareJpg"
+          type="button"
+          class="px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-extrabold text-base shadow-sm transition flex items-center gap-2 cursor-pointer"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.3" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          <span>Share / Save Image</span>
+        </button>
+
+        <a
+          id="directJpgDownloadLink"
+          download="Personalized_Exam_Timetable.jpg"
+          href="#"
+          class="px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-base shadow-sm transition flex items-center gap-2"
+        >
+          <span>Download JPG</span>
+        </a>
+
+        <button
+          id="btnDoneJpgModal"
+          type="button"
+          class="px-4 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-base transition cursor-pointer"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Banner -->
+  <div id="toastBanner" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 hidden max-w-[92vw] bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl border border-slate-700 flex items-center gap-2.5 text-sm sm:text-base font-bold">
+    <span id="toastIcon" class="w-3 h-3 rounded-full bg-emerald-400 shrink-0"></span>
+    <span id="toastMessage">Ready</span>
+  </div>
+
+  <script>
+    // Application State (Venue completely omitted)
     const state = {
       registeredCodes: [],
       generalSlots: [],
-      matchedRows: [],
-      theme: 'classic',
-      showVenue: true,
-      activeInputTab: 'slip', // 'slip' | 'timetable'
+      matchedSchedule: [],
+      missingCodes: [],
+      activeMobileTab: 'setup', // 'setup' | 'preview'
+      lastExportedBlob: null,
+      lastExportedDataUrl: '',
     };
 
-    // =========================================================================
-    // NAVIGATION & TAB CONTROLLERS (ZERO-SCROLL UX)
-    // =========================================================================
-    function switchInputTab(tabName) {
-      state.activeInputTab = tabName;
-      const slipBtn = document.getElementById('tab-btn-slip');
-      const ttBtn = document.getElementById('tab-btn-timetable');
-      const slipPanel = document.getElementById('tab-panel-slip');
-      const ttPanel = document.getElementById('tab-panel-timetable');
-      const ttNum = document.getElementById('tab-tt-num');
-
-      if (tabName === 'slip') {
-        slipBtn.className = 'flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold bg-white text-slate-900 shadow-2xs border border-slate-200/80 transition cursor-pointer';
-        ttBtn.className = 'flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-white/60 transition cursor-pointer';
-        ttNum.className = 'w-4 h-4 rounded-full bg-slate-300 text-slate-700 text-[10px] flex items-center justify-center font-extrabold';
-        slipPanel.classList.remove('hidden');
-        ttPanel.classList.add('hidden');
-      } else {
-        ttBtn.className = 'flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold bg-white text-slate-900 shadow-2xs border border-slate-200/80 transition cursor-pointer';
-        slipBtn.className = 'flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-white/60 transition cursor-pointer';
-        ttNum.className = 'w-4 h-4 rounded-full bg-indigo-600 text-white text-[10px] flex items-center justify-center font-extrabold';
-        ttPanel.classList.remove('hidden');
-        slipPanel.classList.add('hidden');
-      }
-    }
-
-    function switchMobileView(view) {
-      const leftPanel = document.getElementById('left-input-panel');
-      const rightPanel = document.getElementById('right-preview-panel');
-      const btnInputs = document.getElementById('mobile-view-inputs');
-      const btnPreview = document.getElementById('mobile-view-preview');
-
-      if (view === 'inputs') {
-        leftPanel.classList.remove('hidden');
-        rightPanel.classList.add('hidden');
-        rightPanel.classList.remove('flex');
-        btnInputs.className = 'py-2.5 text-center border-b-2 border-emerald-600 text-emerald-700 bg-white cursor-pointer';
-        btnPreview.className = 'py-2.5 text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800 cursor-pointer';
-      } else {
-        leftPanel.classList.add('hidden');
-        rightPanel.classList.remove('hidden');
-        rightPanel.classList.add('flex');
-        btnPreview.className = 'py-2.5 text-center border-b-2 border-emerald-600 text-emerald-700 bg-white cursor-pointer';
-        btnInputs.className = 'py-2.5 text-center border-b-2 border-transparent text-slate-500 hover:text-slate-800 cursor-pointer';
-      }
-    }
-
-    function updateCounters() {
-      document.getElementById('code-count').textContent = state.registeredCodes.length;
-      document.getElementById('tab-slip-count').textContent = state.registeredCodes.length;
-      document.getElementById('mobile-code-badge').textContent = state.registeredCodes.length;
-
-      document.getElementById('tab-tt-count').textContent = state.generalSlots.length;
-      document.getElementById('parsed-slots-badge').textContent = `${state.generalSlots.length} slots parsed`;
-
-      document.getElementById('mobile-exam-badge').textContent = state.matchedRows.length;
-    }
-
-    // =========================================================================
-    // UTILITY FUNCTIONS
-    // =========================================================================
-    function showToast(message, type = 'info') {
-      const container = document.getElementById('toast-container');
-      const toast = document.createElement('div');
-      const colors = {
-        success: 'bg-emerald-900 text-white border-emerald-700',
-        error: 'bg-rose-900 text-white border-rose-700',
-        warning: 'bg-amber-900 text-white border-amber-700',
-        info: 'bg-slate-900 text-white border-slate-700',
-      };
-      toast.className = `pointer-events-auto px-3.5 py-2.5 rounded-xl border shadow-lg text-xs font-medium flex items-center justify-between gap-3 transition-all duration-300 ${colors[type] || colors.info}`;
-      toast.innerHTML = `<span>${message}</span><button class="opacity-70 hover:opacity-100 cursor-pointer" onclick="this.parentElement.remove()">✕</button>`;
-      container.appendChild(toast);
-      setTimeout(() => {
-        if (toast.parentElement) toast.remove();
-      }, 3800);
-    }
-
-    function normalizeCode(raw) {
-      if (!raw) return '';
-      return raw
-        .toUpperCase()
-        .replace(/^NOUN[\s\-_]*/i, '')
-        .replace(/\s+/g, '')
-        .replace(/[^A-Z0-9]/g, '');
-    }
-
-    function extractCourseCodesFromText(text) {
-      if (!text) return [];
-      const regex = /\b([A-Z]{3})\s*[-]?\s*(\d{3})\b/gi;
-      const found = new Set();
-      let match;
-      while ((match = regex.exec(text)) !== null) {
-        const prefix = match[1].toUpperCase();
-        if (!['DAY', 'FEE', 'SNO', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN', 'NOV', 'DEC', 'JAN', 'FEB', 'MAR', 'APR', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT'].includes(prefix)) {
-          found.add(`${prefix}${match[2]}`);
-        }
-      }
-      return Array.from(found);
-    }
-
-    function parseDateSortKey(dateStr, timeStr) {
-      let baseTime = Number.MAX_SAFE_INTEGER;
-      if (dateStr) {
-        const cleaned = dateStr
-          .replace(/(\d+)(st|nd|rd|th)/gi, '$1')
-          .replace(/,/g, ' ')
-          .trim();
-        const parsed = Date.parse(cleaned);
-        if (!isNaN(parsed)) {
-          baseTime = parsed;
-        }
-      }
-      let hourOffset = 0;
-      if (timeStr) {
-        const t = timeStr.toLowerCase();
-        const m = t.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
-        if (m) {
-          let h = parseInt(m[1], 10);
-          const mins = m[2] ? parseInt(m[2], 10) : 0;
-          const mer = m[3];
-          if (mer === 'pm' && h < 12) h += 12;
-          if (mer === 'am' && h === 12) h = 0;
-          hourOffset = h * 60 + mins;
-        }
-      }
-      return baseTime + hourOffset * 60 * 1000;
-    }
-
-    // =========================================================================
-    // STEP 1: EXAM SLIP UPLOAD & OCR / CODE EXTRACTION
-    // =========================================================================
-    function renderCodePills() {
-      const container = document.getElementById('course-pills-container');
-      updateCounters();
-
-      if (state.registeredCodes.length === 0) {
-        container.innerHTML = `<p class="text-xs text-slate-400 italic">No course codes yet. Upload your exam slip or click "Load Sample Slip".</p>`;
-        return;
-      }
-
-      container.innerHTML = state.registeredCodes
-        .map(
-          (code) => `
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 font-mono text-xs font-bold">
-            ${code}
-            <button type="button" onclick="removeRegisteredCode('${code}')" class="text-emerald-600 hover:text-rose-600 focus:outline-none cursor-pointer" title="Remove ${code}">✕</button>
-          </span>
-        `
-        )
-        .join('');
-    }
-
-    function addRegisteredCodes(codesArray, autoAdvance = false) {
-      let addedCount = 0;
-      codesArray.forEach((raw) => {
-        const norm = normalizeCode(raw);
-        if (norm && /^[A-Z]{3}\d{3}$/.test(norm) && !state.registeredCodes.includes(norm)) {
-          state.registeredCodes.push(norm);
-          addedCount++;
-        }
-      });
-      renderCodePills();
-      if (state.generalSlots.length > 0) {
-        runMatchingEngine();
-      } else if (autoAdvance && state.registeredCodes.length > 0) {
-        switchInputTab('timetable');
-      }
-      return addedCount;
-    }
-
-    window.removeRegisteredCode = function (code) {
-      state.registeredCodes = state.registeredCodes.filter((c) => c !== code);
-      renderCodePills();
-      if (state.generalSlots.length > 0) {
-        runMatchingEngine();
-      }
-    };
-
-    async function handleSlipFile(file) {
-      if (!file) return;
-      const progressWrap = document.getElementById('slip-progress-wrap');
-      const progressLabel = document.getElementById('slip-progress-label');
-      const progressPct = document.getElementById('slip-progress-pct');
-      const progressBar = document.getElementById('slip-progress-bar');
-
-      progressWrap.classList.remove('hidden');
-      progressLabel.textContent = 'Reading exam slip...';
-      progressPct.textContent = '10%';
-      progressBar.style.width = '10%';
-
-      try {
-        let extractedText = '';
-
-        if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-          extractedText = await extractTextFromPDF(file, (pct) => {
-            progressLabel.textContent = 'Extracting PDF slip...';
-            progressPct.textContent = `${pct}%`;
-            progressBar.style.width = `${pct}%`;
-          });
-        } else if (file.type.startsWith('image/')) {
-          const worker = await Tesseract.createWorker('eng', 1, {
-            logger: (m) => {
-              if (m.status === 'recognizing text') {
-                const pct = Math.round(m.progress * 100);
-                progressLabel.textContent = 'Scanning exam slip OCR...';
-                progressPct.textContent = `${pct}%`;
-                progressBar.style.width = `${pct}%`;
-              }
-            },
-          });
-          const ret = await worker.recognize(file);
-          extractedText = ret.data.text;
-          await worker.terminate();
-        } else {
-          extractedText = await file.text();
-        }
-
-        const codes = extractCourseCodesFromText(extractedText);
-        const added = addRegisteredCodes(codes, true);
-
-        if (codes.length > 0) {
-          showToast(`Extracted ${codes.length} course code(s) (${added} new).`, 'success');
-        } else {
-          showToast('No standard course codes detected. Type or paste them manually.', 'warning');
-        }
-      } catch (err) {
-        console.error(err);
-        showToast('Error reading exam slip file.', 'error');
-      } finally {
-        setTimeout(() => progressWrap.classList.add('hidden'), 1000);
-      }
-    }
-
-    // =========================================================================
-    // STEP 2: GENERAL TIMETABLE UPLOAD & MULTI-FORMAT PARSER
-    // =========================================================================
-    async function extractTextFromPDF(file, onProgress) {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      let fullText = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        if (onProgress) onProgress(Math.round((i / pdf.numPages) * 100));
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const lines = {};
-        textContent.items.forEach((item) => {
-          const y = Math.round(item.transform[5] / 5) * 5;
-          if (!lines[y]) lines[y] = [];
-          lines[y].push({ x: item.transform[4], str: item.str });
-        });
-        const sortedYs = Object.keys(lines)
-          .map(Number)
-          .sort((a, b) => b - a);
-        sortedYs.forEach((y) => {
-          const rowStr = lines[y]
-            .sort((a, b) => a.x - b.x)
-            .map((i) => i.str)
-            .join(' ');
-          fullText += rowStr + '\n';
-        });
-      }
-      return fullText;
-    }
-
-    async function handleTimetableFile(file) {
-      if (!file) return;
-      const progressWrap = document.getElementById('tt-progress-wrap');
-      const progressLabel = document.getElementById('tt-progress-label');
-      const progressPct = document.getElementById('tt-progress-pct');
-      const progressBar = document.getElementById('tt-progress-bar');
-
-      progressWrap.classList.remove('hidden');
-      progressLabel.textContent = 'Processing general timetable...';
-      progressPct.textContent = '15%';
-      progressBar.style.width = '15%';
-
-      try {
-        let rawText = '';
-        const nameLower = file.name.toLowerCase();
-
-        if (file.type === 'application/pdf' || nameLower.endsWith('.pdf')) {
-          rawText = await extractTextFromPDF(file, (pct) => {
-            progressLabel.textContent = 'Reading PDF timetable...';
-            progressPct.textContent = `${pct}%`;
-            progressBar.style.width = `${pct}%`;
-          });
-        } else if (nameLower.endsWith('.xlsx') || nameLower.endsWith('.xls') || nameLower.endsWith('.csv')) {
-          const data = await file.arrayBuffer();
-          const workbook = XLSX.read(data);
-          workbook.SheetNames.forEach((sheetName) => {
-            const sheet = workbook.Sheets[sheetName];
-            rawText += XLSX.utils.sheet_to_csv(sheet, { FS: ' | ' }) + '\n';
-          });
-          progressPct.textContent = '100%';
-          progressBar.style.width = '100%';
-        } else if (file.type.startsWith('image/')) {
-          const worker = await Tesseract.createWorker('eng', 1, {
-            logger: (m) => {
-              if (m.status === 'recognizing text') {
-                const pct = Math.round(m.progress * 100);
-                progressLabel.textContent = 'Running OCR on timetable image...';
-                progressPct.textContent = `${pct}%`;
-                progressBar.style.width = `${pct}%`;
-              }
-            },
-          });
-          const ret = await worker.recognize(file);
-          rawText = ret.data.text;
-          await worker.terminate();
-        } else {
-          rawText = await file.text();
-        }
-
-        document.getElementById('raw-timetable-text').value = rawText.trim();
-        parseGeneralTimetableText(rawText);
-        showToast(`Parsed ${state.generalSlots.length} general timetable slots.`, 'success');
-
-        // Auto-switch to live preview on mobile once both inputs are ready
-        if (window.innerWidth < 1024 && state.registeredCodes.length > 0 && state.matchedRows.length > 0) {
-          switchMobileView('preview');
-        }
-      } catch (err) {
-        console.error(err);
-        showToast('Could not parse timetable file. Try pasting text directly.', 'error');
-      } finally {
-        setTimeout(() => progressWrap.classList.add('hidden'), 1000);
-      }
-    }
-
-    function parseGeneralTimetableText(text) {
-      const slots = [];
-      if (!text || !text.trim()) {
-        state.generalSlots = [];
-        updateCounters();
-        return;
-      }
-
-      const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-
-      const dayRegex = /\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b/i;
-      const dateRegex = /\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*,?\s*\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\b/i;
-      const timeRegex = /\b(\d{1,2}(?::\d{2})?\s*(?:am|pm))\b/gi;
-
-      let currentDay = 'Scheduled Day';
-      let currentDate = 'Date TBA';
-      let currentTimes = ['8:30am', '11:00am', '2:00pm'];
-
-      lines.forEach((line) => {
-        if (line.includes('|')) {
-          const parts = line.split('|').map((p) => p.trim());
-          let rowDay = currentDay;
-          let rowDate = currentDate;
-          let rowTime = '';
-          let rowVenue = 'Designated Study Centre';
-          const rowCodes = [];
-
-          parts.forEach((part) => {
-            const dMatch = part.match(dayRegex);
-            if (dMatch) rowDay = dMatch[1];
-
-            const dtMatch = part.match(dateRegex);
-            if (dtMatch) rowDate = dtMatch[1];
-
-            const tMatch = part.match(/\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i);
-            if (tMatch && !rowTime) rowTime = tMatch[0];
-
-            let cMatch;
-            const localCodeRe = /\b(?:NOUN[\s\-_]*)?([A-Z]{3})\s*[-]?\s*(\d{3})\b/gi;
-            let foundCodeInPart = false;
-            while ((cMatch = localCodeRe.exec(part)) !== null) {
-              const pfx = cMatch[1].toUpperCase();
-              if (!['DAY', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN', 'NOV', 'DEC', 'JAN', 'FEB', 'MAR', 'APR', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT'].includes(pfx)) {
-                rowCodes.push(`${pfx}${cMatch[2]}`);
-                foundCodeInPart = true;
-              }
-            }
-
-            if (!foundCodeInPart && !dMatch && !dtMatch && !tMatch && part.length > 2 && part.length < 48) {
-              if (/hall|venue|centre|center|auditorium|lab|room|block|cbt|wing|session|batch/i.test(part)) {
-                rowVenue = part;
-              }
-            }
-          });
-
-          if (dayRegex.test(line) || dateRegex.test(line)) {
-            currentDay = rowDay;
-            currentDate = rowDate;
-          }
-
-          const allTimesInLine = [...line.matchAll(timeRegex)].map((m) => m[1]);
-          if (rowCodes.length === 0 && allTimesInLine.length >= 2) {
-            currentTimes = allTimesInLine;
-            return;
-          }
-
-          if (rowCodes.length > 0) {
-            if (!rowTime && parts.length >= 3) {
-              parts.forEach((cell, idx) => {
-                const cellCodes = extractCourseCodesFromText(cell);
-                const mappedTime = currentTimes[idx] || currentTimes[0] || '8:30am';
-                cellCodes.forEach((c) => {
-                  slots.push({
-                    day: rowDay,
-                    date: rowDate,
-                    time: mappedTime,
-                    code: c,
-                    venue: rowVenue,
-                    sortKey: parseDateSortKey(rowDate, mappedTime),
-                  });
-                });
-              });
-            } else {
-              rowCodes.forEach((c) => {
-                const t = rowTime || currentTimes[0] || '8:30am';
-                slots.push({
-                  day: rowDay,
-                  date: rowDate,
-                  time: t,
-                  code: c,
-                  venue: rowVenue,
-                  sortKey: parseDateSortKey(rowDate, t),
-                });
-              });
-            }
-            return;
-          }
-        }
-
-        const dMatch = line.match(dayRegex);
-        if (dMatch) currentDay = dMatch[1];
-
-        const dtMatch = line.match(dateRegex);
-        if (dtMatch) currentDate = dtMatch[1];
-
-        const lineTimes = [...line.matchAll(timeRegex)].map((m) => m[1]);
-        if (lineTimes.length >= 2 && extractCourseCodesFromText(line).length === 0) {
-          currentTimes = lineTimes;
-        }
-
-        const codesInLine = extractCourseCodesFromText(line);
-        if (codesInLine.length > 0) {
-          codesInLine.forEach((code, idx) => {
-            const assignedTime =
-              lineTimes[idx] ||
-              lineTimes[0] ||
-              (codesInLine.length > 1 ? currentTimes[idx % currentTimes.length] : currentTimes[0]) ||
-              '8:30am';
-            slots.push({
-              day: currentDay,
-              date: currentDate,
-              time: assignedTime,
-              code: code,
-              venue: 'Designated Study Centre',
-              sortKey: parseDateSortKey(currentDate, assignedTime),
-            });
-          });
-        }
-      });
-
-      state.generalSlots = slots;
-      updateCounters();
-      if (state.registeredCodes.length > 0) {
-        runMatchingEngine();
-      }
-    }
-
-    // =========================================================================
-    // STEP 3: STRICT COURSE-CODE MATCHING ENGINE (PRESERVES REPEATS & FLAGS CLASHES)
-    // =========================================================================
-    function runMatchingEngine() {
-      const rawText = document.getElementById('raw-timetable-text').value;
-      if (rawText.trim() && state.generalSlots.length === 0) {
-        parseGeneralTimetableText(rawText);
-      }
-
-      if (state.registeredCodes.length === 0) {
-        return;
-      }
-
-      const registeredSet = new Set(state.registeredCodes.map(normalizeCode));
-
-      // Filter strictly by Course Code — preserve ALL repeated occurrences
-      const matched = state.generalSlots
-        .filter((slot) => registeredSet.has(normalizeCode(slot.code)))
-        .map((slot) => ({
-          ...slot,
-          code: normalizeCode(slot.code),
-        }));
-
-      matched.sort((a, b) => a.sortKey - b.sortKey);
-
-      const codeFrequency = {};
-      const slotFrequency = {};
-
-      matched.forEach((item) => {
-        codeFrequency[item.code] = (codeFrequency[item.code] || 0) + 1;
-        const slotKey = `${item.date.toLowerCase().trim()}|${item.time.toLowerCase().replace(/\s+/g, '')}`;
-        slotFrequency[slotKey] = (slotFrequency[slotKey] || 0) + 1;
-      });
-
-      state.matchedRows = matched.map((item) => {
-        const slotKey = `${item.date.toLowerCase().trim()}|${item.time.toLowerCase().replace(/\s+/g, '')}`;
-        return {
-          ...item,
-          isRepeated: codeFrequency[item.code] > 1,
-          isClash: slotFrequency[slotKey] > 1,
-        };
-      });
-
-      const matchedCodeSet = new Set(matched.map((m) => m.code));
-      const unmatchedCodes = state.registeredCodes.filter((c) => !matchedCodeSet.has(c));
-
-      const unmatchedAlert = document.getElementById('unmatched-alert');
-      const unmatchedList = document.getElementById('unmatched-list');
-      if (unmatchedCodes.length > 0) {
-        unmatchedList.textContent = unmatchedCodes.join(', ');
-        unmatchedAlert.classList.remove('hidden');
-      } else {
-        unmatchedAlert.classList.add('hidden');
-      }
-
-      renderPersonalizedTable();
-      updateCounters();
-    }
-
-    function renderPersonalizedTable() {
-      const tbody = document.getElementById('personalized-tbody');
-      const badge = document.getElementById('render-badge');
-      const clashAlert = document.getElementById('clash-alert');
-
-      const codeFreq = {};
-      const slotFreq = {};
-      state.matchedRows.forEach((r) => {
-        const c = normalizeCode(r.code);
-        codeFreq[c] = (codeFreq[c] || 0) + 1;
-        const sk = `${(r.date || '').toLowerCase().trim()}|${(r.time || '').toLowerCase().replace(/\s+/g, '')}`;
-        slotFreq[sk] = (slotFreq[sk] || 0) + 1;
-      });
-
-      let hasAnyClash = false;
-      state.matchedRows = state.matchedRows.map((r) => {
-        const c = normalizeCode(r.code);
-        const sk = `${(r.date || '').toLowerCase().trim()}|${(r.time || '').toLowerCase().replace(/\s+/g, '')}`;
-        const isClash = slotFreq[sk] > 1;
-        if (isClash) hasAnyClash = true;
-        return {
-          ...r,
-          code: c,
-          isRepeated: codeFreq[c] > 1,
-          isClash,
-        };
-      });
-
-      if (hasAnyClash) {
-        clashAlert.classList.remove('hidden');
-      } else {
-        clashAlert.classList.add('hidden');
-      }
-
-      badge.textContent = `${state.matchedRows.length} Exam${state.matchedRows.length === 1 ? '' : 's'}`;
-      updateCounters();
-
-      if (state.matchedRows.length === 0) {
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="6" class="py-12 px-4 text-center text-slate-400">
-              <p class="font-medium text-slate-600 mb-1">Your live JPG preview appears here automatically</p>
-              <p class="text-[11px]">Upload your Exam Slip & General Timetable on the left, or click <strong class="text-emerald-600">Instant Demo</strong> in the top bar.</p>
-            </td>
-          </tr>
-        `;
-        return;
-      }
-
-      tbody.innerHTML = state.matchedRows
-        .map((row, idx) => {
-          const rowBg = row.isClash ? 'bg-rose-50/85' : idx % 2 === 1 ? 'bg-slate-50/75' : 'bg-white';
-          return `
-            <tr class="${rowBg} transition-colors">
-              <td class="py-2.5 px-3 text-center font-semibold text-slate-500">${idx + 1}</td>
-              <td class="py-2.5 px-3">
-                <div class="font-bold text-slate-900 leading-tight">${escapeHtml(row.day)}</div>
-                <div class="text-[11px] text-slate-500">${escapeHtml(row.date)}</div>
-              </td>
-              <td class="py-2.5 px-3">
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
-                  ${escapeHtml(row.time)}
-                </span>
-              </td>
-              <td class="py-2.5 px-3">
-                <div class="flex flex-wrap items-center gap-1.5">
-                  <span class="font-mono text-sm font-extrabold tracking-wide text-slate-900">${escapeHtml(row.code)}</span>
-                  ${
-                    row.isRepeated
-                      ? `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-indigo-100 text-indigo-800">Repeated</span>`
-                      : ''
-                  }
-                  ${
-                    row.isClash
-                      ? `<span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-rose-600 text-white">Clash</span>`
-                      : ''
-                  }
-                </div>
-              </td>
-              <td class="py-2.5 px-3 text-[11px] text-slate-600 venue-col ${state.showVenue ? '' : 'hidden'}">
-                ${escapeHtml(row.venue || 'Designated Study Centre')}
-              </td>
-              <td class="py-2.5 px-2.5 text-right no-export">
-                <div class="inline-flex items-center gap-0.5">
-                  <button type="button" onclick="openEditRowModal(${idx})" class="p-1 rounded text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 cursor-pointer" title="Edit">✎</button>
-                  <button type="button" onclick="deleteMatchedRow(${idx})" class="p-1 rounded text-slate-500 hover:text-rose-600 hover:bg-rose-50 cursor-pointer" title="Remove">✕</button>
-                </div>
-              </td>
-            </tr>
-          `;
-        })
-        .join('');
-
-      applyVenueColumnVisibility();
-    }
-
-    function escapeHtml(str) {
-      return String(str || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-    }
-
-    function applyVenueColumnVisibility() {
-      document.querySelectorAll('.venue-col').forEach((el) => {
-        if (state.showVenue) {
-          el.classList.remove('hidden');
-        } else {
-          el.classList.add('hidden');
-        }
-      });
-    }
-
-    // =========================================================================
-    // INLINE ROW EDITING & MODAL
-    // =========================================================================
-    window.openEditRowModal = function (index) {
-      const modal = document.getElementById('row-modal');
-      const title = document.getElementById('modal-title');
-      document.getElementById('edit-row-index').value = index;
-
-      if (index >= 0 && state.matchedRows[index]) {
-        const r = state.matchedRows[index];
-        title.textContent = 'Edit Exam Schedule Entry';
-        document.getElementById('field-code').value = r.code;
-        document.getElementById('field-day').value = r.day;
-        document.getElementById('field-date').value = r.date;
-        document.getElementById('field-time').value = r.time;
-        document.getElementById('field-venue').value = r.venue || '';
-      } else {
-        title.textContent = 'Add Exam Schedule Entry';
-        document.getElementById('row-form').reset();
-        document.getElementById('edit-row-index').value = -1;
-      }
-
-      modal.classList.remove('hidden');
-    };
-
-    window.deleteMatchedRow = function (index) {
-      state.matchedRows.splice(index, 1);
-      renderPersonalizedTable();
-      showToast('Removed schedule entry.', 'info');
-    };
-
-    document.getElementById('row-form').addEventListener('submit', (e) => {
-      e.preventDefault();
-      const idx = parseInt(document.getElementById('edit-row-index').value, 10);
-      const code = normalizeCode(document.getElementById('field-code').value);
-      const day = document.getElementById('field-day').value.trim();
-      const date = document.getElementById('field-date').value.trim();
-      const time = document.getElementById('field-time').value.trim();
-      const venue = document.getElementById('field-venue').value.trim() || 'Designated Study Centre';
-
-      const entry = {
-        code,
-        day,
-        date,
-        time,
-        venue,
-        sortKey: parseDateSortKey(date, time),
-      };
-
-      if (idx >= 0) {
-        state.matchedRows[idx] = entry;
-      } else {
-        state.matchedRows.push(entry);
-        if (!state.registeredCodes.includes(code)) {
-          addRegisteredCodes([code]);
-        }
-      }
-
-      state.matchedRows.sort((a, b) => a.sortKey - b.sortKey);
-      renderPersonalizedTable();
-      document.getElementById('row-modal').classList.add('hidden');
-      showToast('Schedule updated.', 'success');
-    });
-
-    // =========================================================================
-    // THEME SWITCHING & HIGH-RESOLUTION JPG DOWNLOAD
-    // =========================================================================
-    function applyCardTheme(themeName) {
-      state.theme = themeName;
-      const headerBand = document.getElementById('card-header-band');
-      const tableHead = document.getElementById('card-table-head');
-      const footerBand = document.getElementById('card-footer-band');
-      const exportCard = document.getElementById('timetable-export-card');
-
-      document.querySelectorAll('.theme-btn').forEach((btn) => {
-        if (btn.dataset.theme === themeName) {
-          btn.className = 'theme-btn px-2 py-1 rounded-md text-[11px] font-bold bg-white text-slate-900 shadow-2xs cursor-pointer';
-        } else {
-          btn.className = 'theme-btn px-2 py-1 rounded-md text-[11px] font-medium text-slate-600 hover:text-slate-900 cursor-pointer';
-        }
-      });
-
-      if (themeName === 'navy') {
-        exportCard.className = 'w-full max-w-3xl rounded-xl border border-indigo-900/20 bg-white text-slate-900 overflow-hidden shadow-md';
-        headerBand.className = 'px-5 py-3.5 bg-indigo-950 text-white flex items-center justify-between gap-3';
-        tableHead.className = 'bg-indigo-50 text-indigo-950 border-b border-indigo-100 text-[10px] font-extrabold uppercase tracking-wider';
-        footerBand.className = 'px-5 py-2.5 bg-indigo-50/50 border-t border-indigo-100 flex items-center justify-between text-[10px] text-indigo-900/70';
-      } else if (themeName === 'emerald') {
-        exportCard.className = 'w-full max-w-3xl rounded-xl border border-emerald-800/25 bg-white text-slate-900 overflow-hidden shadow-md';
-        headerBand.className = 'px-5 py-3.5 bg-emerald-800 text-white flex items-center justify-between gap-3';
-        tableHead.className = 'bg-emerald-50 text-emerald-950 border-b border-emerald-100 text-[10px] font-extrabold uppercase tracking-wider';
-        footerBand.className = 'px-5 py-2.5 bg-emerald-50/50 border-t border-emerald-100 flex items-center justify-between text-[10px] text-emerald-900/70';
-      } else {
-        exportCard.className = 'w-full max-w-3xl rounded-xl border border-slate-300 bg-white text-slate-900 overflow-hidden shadow-md';
-        headerBand.className = 'px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between gap-3';
-        tableHead.className = 'bg-slate-100 text-slate-700 border-b border-slate-200 text-[10px] font-extrabold uppercase tracking-wider';
-        footerBand.className = 'px-5 py-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[10px] text-slate-500';
-      }
-    }
-
-    async function downloadTimetableAsJPG() {
-      if (state.matchedRows.length === 0) {
-        showToast('Generate your timetable first (or click Instant Demo) before downloading.', 'warning');
-        return;
-      }
-
-      const btn = document.getElementById('btn-download-jpg');
-      const originalHtml = btn.innerHTML;
-      btn.disabled = true;
-      btn.innerHTML = 'Exporting...';
-
-      const card = document.getElementById('timetable-export-card');
-      const noExportEls = card.querySelectorAll('.no-export');
-      noExportEls.forEach((el) => (el.style.display = 'none'));
-
-      try {
-        const canvas = await html2canvas(card, {
-          scale: 3,
-          useCORS: true,
-          backgroundColor: '#ffffff',
-          logging: false,
-        });
-
-        const jpgDataUrl = canvas.toDataURL('image/jpeg', 0.96);
-        const link = document.createElement('a');
-        link.download = 'personalized-exam-timetable.jpg';
-        link.href = jpgDataUrl;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        showToast('Downloaded personalized-exam-timetable.jpg!', 'success');
-      } catch (err) {
-        console.error(err);
-        showToast('Failed to generate JPG image.', 'error');
-      } finally {
-        noExportEls.forEach((el) => (el.style.display = ''));
-        btn.disabled = false;
-        btn.innerHTML = originalHtml;
-      }
-    }
-
-    // =========================================================================
-    // SAMPLE DATA (BASED ON NOUN EXAM SLIP & GENERAL TIMETABLE WITH REPEATS)
-    // =========================================================================
-    const SAMPLE_NOUN_SLIP_CODES = [
+    // Realistic NOUN 2026_2 Sample Dataset (including repeats for MTH102 and GST201)
+    const SAMPLE_REGISTERED_CODES = [
       'CIT206',
       'CIT210',
       'CIT212',
@@ -1212,184 +564,1221 @@
       'STT211',
     ];
 
-    const SAMPLE_GENERAL_TIMETABLE_TEXT = `Wednesday, 18th November, 2026 | 8:30am | NOUN-MTH102 | CBT Lab 1
-Wednesday, 18th November, 2026 | 2:00pm | CIT213 | CBT Lab 2
-Thursday, 19th November, 2026 | 8:30am | IFT211 | Hall B
-Friday, 20th November, 2026 | 11:00am | CIT292 | Computer Lab II
-Friday, 20th November, 2026 | 3:00pm | CIT210 | Main Auditorium
-Saturday, 21st November, 2026 | 11:00am | GST201-A | CBT Hall A (Batch A)
-Monday, 23rd November, 2026 | 11:00am | CIT216 | CBT Lab 1
-Monday, 23rd November, 2026 | 2:00pm | CIT212 | CBT Lab 3
-Thursday, 26th November, 2026 | 8:30am | CIT206 | CBT Hall A
-Friday, 27th November, 2026 | 11:00am | NOUN-IFT292 | Computer Lab II
-Tuesday, 1st December, 2026 | 2:00pm | STT211 | Science CBT Wing
-Saturday, 5th December, 2026 | 8:30am | GST201-B | CBT Hall B (Batch B)
-Saturday, 5th December, 2026 | 8:30am | MTH102 | CBT Hall C (Repeat Session)`;
+    const SAMPLE_GENERAL_SLOTS = [
+      { date: 'Wednesday, 18th November, 2026', session: '8:30am', rawCode: 'NOUN-MTH102', code: 'MTH102', sortKey: 202611180830 },
+      { date: 'Wednesday, 18th November, 2026', session: '2:00pm', rawCode: 'CIT213', code: 'CIT213', sortKey: 202611181400 },
+      { date: 'Friday, 20th November, 2026', session: '11:00am', rawCode: 'CIT292', code: 'CIT292', sortKey: 202611201100 },
+      { date: 'Friday, 20th November, 2026', session: '3:00pm', rawCode: 'CIT210', code: 'CIT210', sortKey: 202611201500 },
+      { date: 'Saturday, 21st November, 2026', session: '11:00am', rawCode: 'GST201-A', code: 'GST201', sortKey: 202611211100 },
+      { date: 'Monday, 23rd November, 2026', session: '11:00am', rawCode: 'CIT216', code: 'CIT216', sortKey: 202611231100 },
+      { date: 'Monday, 23rd November, 2026', session: '2:00pm', rawCode: 'CIT212', code: 'CIT212', sortKey: 202611231400 },
+      { date: 'Thursday, 26th November, 2026', session: '8:30am', rawCode: 'CIT206', code: 'CIT206', sortKey: 202611260830 },
+      { date: 'Tuesday, 1st December, 2026', session: '2:00pm', rawCode: 'STT211', code: 'STT211', sortKey: 202612011400 },
+      { date: 'Saturday, 5th December, 2026', session: '8:30am', rawCode: 'MTH102', code: 'MTH102', sortKey: 202612050830 },
+      { date: 'Saturday, 5th December, 2026', session: '8:30am', rawCode: 'GST201-B', code: 'GST201', sortKey: 202612050830 },
+    ];
 
-    function loadSampleSlip() {
-      state.registeredCodes = [];
-      addRegisteredCodes(SAMPLE_NOUN_SLIP_CODES, true);
-      showToast('Loaded 9 course codes from sample NOUN exam slip.', 'success');
+    // DOM Cache
+    const el = {
+      tabBtnSetup: document.getElementById('tabBtnSetup'),
+      tabBtnPreview: document.getElementById('tabBtnPreview'),
+      tabCodesBadge: document.getElementById('tabCodesBadge'),
+      tabExamsBadge: document.getElementById('tabExamsBadge'),
+      leftSetupPanel: document.getElementById('leftSetupPanel'),
+      rightPreviewPanel: document.getElementById('rightPreviewPanel'),
+      btnMobileViewPreview: document.getElementById('btnMobileViewPreview'),
+      btnMobileViewPreviewLabel: document.getElementById('btnMobileViewPreviewLabel'),
+
+      slipFileInput: document.getElementById('slipFileInput'),
+      slipProgressContainer: document.getElementById('slipProgressContainer'),
+      slipProgressText: document.getElementById('slipProgressText'),
+      slipProgressPercent: document.getElementById('slipProgressPercent'),
+      slipProgressBar: document.getElementById('slipProgressBar'),
+      manualCodeInput: document.getElementById('manualCodeInput'),
+      btnAddManualCode: document.getElementById('btnAddManualCode'),
+      extractedCount: document.getElementById('extractedCount'),
+      extractedCodesContainer: document.getElementById('extractedCodesContainer'),
+      btnLoadSampleSlip: document.getElementById('btnLoadSampleSlip'),
+      btnClearCodes: document.getElementById('btnClearCodes'),
+
+      timetableFileInput: document.getElementById('timetableFileInput'),
+      timetableProgressContainer: document.getElementById('timetableProgressContainer'),
+      timetableProgressText: document.getElementById('timetableProgressText'),
+      timetableProgressPercent: document.getElementById('timetableProgressPercent'),
+      timetableProgressBar: document.getElementById('timetableProgressBar'),
+      parsedSlotsCount: document.getElementById('parsedSlotsCount'),
+      btnToggleRawPaste: document.getElementById('btnToggleRawPaste'),
+      rawPasteBox: document.getElementById('rawPasteBox'),
+      rawTimetableTextarea: document.getElementById('rawTimetableTextarea'),
+      btnParseRawText: document.getElementById('btnParseRawText'),
+
+      missingCoursesAlert: document.getElementById('missingCoursesAlert'),
+      missingCoursesList: document.getElementById('missingCoursesList'),
+      clashAlert: document.getElementById('clashAlert'),
+
+      scheduleTitleInput: document.getElementById('scheduleTitleInput'),
+      scheduleSubtitleInput: document.getElementById('scheduleSubtitleInput'),
+      previewExamCountBadge: document.getElementById('previewExamCountBadge'),
+      scheduleTableBody: document.getElementById('scheduleTableBody'),
+      previewGeneratedDate: document.getElementById('previewGeneratedDate'),
+
+      btnDownloadJpg: document.getElementById('btnDownloadJpg'),
+      btnHeaderDownloadJpg: document.getElementById('btnHeaderDownloadJpg'),
+      btnAddCustomRow: document.getElementById('btnAddCustomRow'),
+      btnInstantDemo: document.getElementById('btnInstantDemo'),
+      btnResetAll: document.getElementById('btnResetAll'),
+
+      editModal: document.getElementById('editModal'),
+      editModalTitle: document.getElementById('editModalTitle'),
+      editEntryForm: document.getElementById('editEntryForm'),
+      editRowIndex: document.getElementById('editRowIndex'),
+      editDayDate: document.getElementById('editDayDate'),
+      editSession: document.getElementById('editSession'),
+      editCourseCode: document.getElementById('editCourseCode'),
+      btnDeleteEntry: document.getElementById('btnDeleteEntry'),
+      btnCancelEdit: document.getElementById('btnCancelEdit'),
+      btnCloseEditModal: document.getElementById('btnCloseEditModal'),
+
+      jpgExportModal: document.getElementById('jpgExportModal'),
+      exportedJpgPreviewImg: document.getElementById('exportedJpgPreviewImg'),
+      btnShareJpg: document.getElementById('btnShareJpg'),
+      directJpgDownloadLink: document.getElementById('directJpgDownloadLink'),
+      btnCloseJpgModal: document.getElementById('btnCloseJpgModal'),
+      btnDoneJpgModal: document.getElementById('btnDoneJpgModal'),
+
+      toastBanner: document.getElementById('toastBanner'),
+      toastIcon: document.getElementById('toastIcon'),
+      toastMessage: document.getElementById('toastMessage'),
+    };
+
+    // Escape HTML helper
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
 
-    function loadSampleTimetable() {
-      document.getElementById('raw-timetable-text').value = SAMPLE_GENERAL_TIMETABLE_TEXT;
-      parseGeneralTimetableText(SAMPLE_GENERAL_TIMETABLE_TEXT);
-      showToast('Loaded sample timetable (with repeated GST201 & MTH102 entries).', 'success');
+    // Toast notification
+    let toastTimer = null;
+    function showToast(message, type = 'success') {
+      el.toastMessage.textContent = message;
+      el.toastIcon.className =
+        'w-3 h-3 rounded-full shrink-0 ' +
+        (type === 'error'
+          ? 'bg-rose-400'
+          : type === 'warning'
+          ? 'bg-amber-400'
+          : 'bg-emerald-400');
+      el.toastBanner.classList.remove('hidden');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        el.toastBanner.classList.add('hidden');
+      }, 3400);
     }
 
-    // =========================================================================
-    // EVENT LISTENERS & INITIALIZATION
-    // =========================================================================
-    document.addEventListener('DOMContentLoaded', () => {
-      const now = new Date();
-      document.getElementById('render-generated-date').textContent = `Generated: ${now.toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      })}`;
+    // Mobile Tab Switcher
+    function setMobileTab(tab) {
+      state.activeMobileTab = tab;
+      if (tab === 'setup') {
+        el.leftSetupPanel.classList.remove('hidden');
+        el.leftSetupPanel.classList.add('flex');
+        el.rightPreviewPanel.classList.add('hidden');
+        el.rightPreviewPanel.classList.remove('flex');
 
-      // Step Tabs & Mobile Switchers
-      document.getElementById('tab-btn-slip').addEventListener('click', () => switchInputTab('slip'));
-      document.getElementById('tab-btn-timetable').addEventListener('click', () => switchInputTab('timetable'));
-      document.getElementById('btn-next-to-timetable').addEventListener('click', () => switchInputTab('timetable'));
-      document.getElementById('btn-back-to-slip').addEventListener('click', () => switchInputTab('slip'));
+        el.tabBtnSetup.className =
+          'py-2 px-3 rounded-lg font-extrabold text-sm sm:text-base transition flex items-center justify-center gap-1.5 bg-white text-indigo-700 shadow-2xs cursor-pointer';
+        el.tabBtnPreview.className =
+          'py-2 px-3 rounded-lg font-extrabold text-sm sm:text-base transition flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900 cursor-pointer';
+      } else {
+        el.leftSetupPanel.classList.add('hidden');
+        el.leftSetupPanel.classList.remove('flex');
+        el.rightPreviewPanel.classList.remove('hidden');
+        el.rightPreviewPanel.classList.add('flex');
 
-      document.getElementById('mobile-view-inputs').addEventListener('click', () => switchMobileView('inputs'));
-      document.getElementById('mobile-view-preview').addEventListener('click', () => switchMobileView('preview'));
+        el.tabBtnPreview.className =
+          'py-2 px-3 rounded-lg font-extrabold text-sm sm:text-base transition flex items-center justify-center gap-1.5 bg-white text-emerald-700 shadow-2xs cursor-pointer';
+        el.tabBtnSetup.className =
+          'py-2 px-3 rounded-lg font-extrabold text-sm sm:text-base transition flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900 cursor-pointer';
+      }
+    }
 
-      // File inputs
-      document.getElementById('slip-file-input').addEventListener('change', (e) => {
-        if (e.target.files[0]) handleSlipFile(e.target.files[0]);
-      });
+    // Normalize Course Code (e.g. "NOUN-CIT210" -> "CIT210", "GST201-A" -> "GST201", "cit 206" -> "CIT206")
+    function normalizeCourseCode(raw) {
+      if (!raw) return '';
+      let cleaned = raw.toUpperCase().replace(/\s+/g, '');
+      cleaned = cleaned.replace(/^NOUN-/, '');
+      cleaned = cleaned.replace(/-[A-Z0-9]+$/, '');
+      return cleaned;
+    }
 
-      document.getElementById('tt-file-input').addEventListener('change', (e) => {
-        if (e.target.files[0]) handleTimetableFile(e.target.files[0]);
-      });
-
-      // Drag & drop support
-      ['slip-dropzone', 'tt-dropzone'].forEach((id) => {
-        const el = document.getElementById(id);
-        el.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          el.classList.add('border-emerald-500', 'bg-emerald-50/50');
-        });
-        el.addEventListener('dragleave', () => {
-          el.classList.remove('border-emerald-500', 'bg-emerald-50/50');
-        });
-        el.addEventListener('drop', (e) => {
-          e.preventDefault();
-          el.classList.remove('border-emerald-500', 'bg-emerald-50/50');
-          const file = e.dataTransfer.files[0];
-          if (!file) return;
-          if (id === 'slip-dropzone') handleSlipFile(file);
-          else handleTimetableFile(file);
-        });
-      });
-
-      // Manual course code addition
-      const addCodeAction = () => {
-        const input = document.getElementById('manual-code-input');
-        const val = input.value.trim();
-        if (!val) return;
-        const tokens = val.split(/[\s,;|\n]+/);
-        const added = addRegisteredCodes(tokens, false);
-        input.value = '';
-        if (added > 0) {
-          showToast(`Added ${added} course code(s).`, 'success');
-        } else {
-          showToast('Enter valid 6-character course codes (e.g., CIT206, GST201).', 'warning');
+    // Extract Course Codes from any unstructured text (ignoring titles, dates, fees)
+    function extractCourseCodesFromText(text) {
+      if (!text) return [];
+      const regex = /\b(?:NOUN-)?([A-Z]{3})\s*(\d{3})(?:-[A-Z0-9]+)?\b/gi;
+      const found = new Set();
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        const prefix = match[1].toUpperCase();
+        const digits = match[2];
+        if (!['PDF', 'JPG', 'PNG', 'SVG', 'WEB', 'HTM', 'CSS', 'APP'].includes(prefix)) {
+          found.add(`${prefix}${digits}`);
         }
+      }
+      return Array.from(found);
+    }
+
+    // Compute chronological sortKey YYYYMMDDHHMM
+    function computeSortKey(dateStr, sessionStr) {
+      const months = {
+        january: 1, jan: 1,
+        february: 2, feb: 2,
+        march: 3, mar: 3,
+        april: 4, apr: 4,
+        may: 5,
+        june: 6, jun: 6,
+        july: 7, jul: 7,
+        august: 8, aug: 8,
+        september: 9, sep: 9, sept: 9,
+        october: 10, oct: 10,
+        november: 11, nov: 11,
+        december: 12, dec: 12,
       };
 
-      document.getElementById('btn-add-code').addEventListener('click', addCodeAction);
-      document.getElementById('manual-code-input').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          addCodeAction();
+      let year = 2026;
+      let month = 11;
+      let day = 1;
+
+      const yearMatch = dateStr.match(/\b(20\d{2})\b/);
+      if (yearMatch) year = parseInt(yearMatch[1], 10);
+
+      const lowerDate = dateStr.toLowerCase();
+      for (const [mName, mNum] of Object.entries(months)) {
+        if (lowerDate.includes(mName)) {
+          month = mNum;
+          break;
+        }
+      }
+
+      const dayMatch = dateStr.match(/\b(\d{1,2})(?:st|nd|rd|th)?\b/);
+      if (dayMatch) day = parseInt(dayMatch[1], 10);
+
+      let hour = 8;
+      let minute = 30;
+      const lowerSession = sessionStr.toLowerCase();
+      if (lowerSession.includes('morning')) {
+        hour = 8; minute = 30;
+      } else if (lowerSession.includes('afternoon')) {
+        hour = 11; minute = 30;
+      } else if (lowerSession.includes('evening')) {
+        hour = 15; minute = 0;
+      } else {
+        const timeMatch = sessionStr.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+        if (timeMatch) {
+          hour = parseInt(timeMatch[1], 10);
+          minute = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+          const meridiem = (timeMatch[3] || '').toLowerCase();
+          if (meridiem === 'pm' && hour < 12) hour += 12;
+          if (meridiem === 'am' && hour === 12) hour = 0;
+          if (!meridiem && hour >= 1 && hour <= 6) hour += 12;
+        }
+      }
+
+      return year * 100000000 + month * 1000000 + day * 10000 + hour * 100 + minute;
+    }
+
+    // Format Session Label consistently
+    function formatSessionLabel(rawSession) {
+      const m = rawSession.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
+      if (!m) return rawSession.trim();
+      return `${m[1]}:${m[2] || '00'}${m[3].toLowerCase()}`;
+    }
+
+    // Parse Structured / Unstructured General Timetable Text into Slots
+    function parseTimetableText(rawText) {
+      const slots = [];
+      const seenSlotKeys = new Set();
+
+      const datePattern =
+        /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+\d{1,2}(?:st|nd|rd|th)?\s+(?:January|February|March|April|May|June|July|August|September|October|November|December),?\s+\d{4}/gi;
+      const timeHeaderPattern =
+        /\b(8:30\s*am|11(?::00)?\s*am|2(?::00)?\s*pm|3(?::00)?\s*pm|\d{1,2}:\d{2}\s*(?:am|pm)|Morning|Afternoon|Evening)\b/gi;
+      const codePattern = /\b((?:NOUN-)?[A-Z]{3}\s*\d{3}(?:-[A-Z0-9]+)?)\b/gi;
+
+      const dateMatches = [...rawText.matchAll(datePattern)];
+
+      if (dateMatches.length > 0) {
+        for (let i = 0; i < dateMatches.length; i++) {
+          const currentDate = dateMatches[i][0].replace(/\s+/g, ' ').trim();
+          const startIdx = i === 0 ? 0 : dateMatches[i - 1].index + dateMatches[i - 1][0].length;
+          const endIdx = dateMatches[i].index + dateMatches[i][0].length;
+          let sectionText = rawText.slice(startIdx, endIdx);
+
+          if (i === dateMatches.length - 1) {
+            const trailing = rawText.slice(endIdx);
+            if (trailing.trim().length > 20) {
+              sectionText += '\n' + trailing;
+            }
+          }
+
+          const lines = sectionText.split(/\r?\n/);
+          let activeTimes = ['8:30am', '11:00am', '2:00pm'];
+
+          for (const line of lines) {
+            const timesInLine = [...line.matchAll(timeHeaderPattern)].map((m) => formatSessionLabel(m[0]));
+            if (timesInLine.length >= 2) {
+              activeTimes = timesInLine;
+              continue;
+            }
+
+            const cells = line.includes('|')
+              ? line.split('|').map((c) => c.trim()).filter(Boolean)
+              : line.split(/\t+|\s{3,}/).map((c) => c.trim()).filter(Boolean);
+
+            if (cells.length >= 2) {
+              cells.forEach((cell, cellIdx) => {
+                const cellCodes = [...cell.matchAll(codePattern)];
+                for (const cm of cellCodes) {
+                  const rawCode = cm[1].toUpperCase().replace(/\s+/g, '');
+                  const normCode = normalizeCourseCode(rawCode);
+                  const sessionGuess =
+                    timesInLine.length === 1
+                      ? timesInLine[0]
+                      : activeTimes[Math.min(Math.floor(cellIdx / 2), activeTimes.length - 1)] || activeTimes[0];
+
+                  const uniqueKey = `${currentDate}|${sessionGuess}|${rawCode}`;
+                  if (!seenSlotKeys.has(uniqueKey)) {
+                    seenSlotKeys.add(uniqueKey);
+                    slots.push({
+                      date: currentDate,
+                      session: sessionGuess,
+                      rawCode,
+                      code: normCode,
+                      sortKey: computeSortKey(currentDate, sessionGuess),
+                    });
+                  }
+                }
+              });
+            } else {
+              const singleTime = timesInLine[0] || activeTimes[0];
+              const lineCodes = [...line.matchAll(codePattern)];
+              for (const cm of lineCodes) {
+                const rawCode = cm[1].toUpperCase().replace(/\s+/g, '');
+                const normCode = normalizeCourseCode(rawCode);
+                const uniqueKey = `${currentDate}|${singleTime}|${rawCode}`;
+                if (!seenSlotKeys.has(uniqueKey)) {
+                  seenSlotKeys.add(uniqueKey);
+                  slots.push({
+                    date: currentDate,
+                    session: singleTime,
+                    rawCode,
+                    code: normCode,
+                    sortKey: computeSortKey(currentDate, singleTime),
+                  });
+                }
+              }
+            }
+          }
+        }
+      } else {
+        const lines = rawText.split(/\r?\n/);
+        let currentDate = 'Scheduled Exam Day';
+        let currentSession = '8:30am';
+
+        for (const line of lines) {
+          const tMatch = line.match(timeHeaderPattern);
+          if (tMatch) currentSession = formatSessionLabel(tMatch[0]);
+
+          const shortDateMatch = line.match(/\b(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})\b/);
+          if (shortDateMatch) currentDate = shortDateMatch[0];
+
+          const lineCodes = [...line.matchAll(codePattern)];
+          for (const cm of lineCodes) {
+            const rawCode = cm[1].toUpperCase().replace(/\s+/g, '');
+            const normCode = normalizeCourseCode(rawCode);
+            const uniqueKey = `${currentDate}|${currentSession}|${rawCode}`;
+            if (!seenSlotKeys.has(uniqueKey)) {
+              seenSlotKeys.add(uniqueKey);
+              slots.push({
+                date: currentDate,
+                session: currentSession,
+                rawCode,
+                code: normCode,
+                sortKey: computeSortKey(currentDate, currentSession),
+              });
+            }
+          }
+        }
+      }
+
+      return slots;
+    }
+
+    // Promise timeout wrapper so slow CDNs/workers never stall at 0%
+    function withTimeout(promise, ms, label) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`${label} timed out`)), ms)
+        ),
+      ]);
+    }
+
+    // Fallback binary/ASCII text extractor if PDF.js is blocked or fails
+    async function extractFallbackBinaryText(file) {
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let ascii = '';
+      for (let i = 0; i < bytes.length; i++) {
+        const b = bytes[i];
+        if ((b >= 32 && b <= 126) || b === 10 || b === 13) {
+          ascii += String.fromCharCode(b);
+        } else {
+          ascii += ' ';
+        }
+      }
+      // Extract parenthesized PDF text literals if present
+      const parenMatches = ascii.match(/\(([^()]{2,80})\)/g);
+      if (parenMatches && parenMatches.length > 10) {
+        return parenMatches.map((s) => s.slice(1, -1)).join(' ');
+      }
+      return ascii;
+    }
+
+    // Extract Text from PDF with PDF.js + 8s timeout + fallback
+    async function extractTextFromPdf(file, onProgress) {
+      if (onProgress) onProgress(15);
+      if (window.pdfjsLib) {
+        try {
+          pdfjsLib.GlobalWorkerOptions.workerSrc =
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+          const arrayBuffer = await file.arrayBuffer();
+          const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+          const pdf = await withTimeout(loadingTask.promise, 8000, 'PDF.js');
+          let fullText = '';
+
+          for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+            const page = await pdf.getPage(pageNum);
+            const textContent = await page.getTextContent();
+            const rows = new Map();
+            for (const item of textContent.items) {
+              const y = Math.round(item.transform[5] / 5) * 5;
+              if (!rows.has(y)) rows.set(y, []);
+              rows.get(y).push({ x: item.transform[4], str: item.str });
+            }
+            const sortedYs = Array.from(rows.keys()).sort((a, b) => b - a);
+            for (const y of sortedYs) {
+              const rowItems = rows.get(y).sort((a, b) => a.x - b.x);
+              fullText += rowItems.map((i) => i.str).join('   ') + '\n';
+            }
+            if (onProgress) {
+              onProgress(Math.min(95, Math.round(15 + (pageNum / pdf.numPages) * 80)));
+            }
+          }
+          if (onProgress) onProgress(100);
+          return fullText;
+        } catch (err) {
+          console.warn('PDF.js fallback triggered:', err);
+        }
+      }
+      if (onProgress) onProgress(60);
+      const fallback = await extractFallbackBinaryText(file);
+      if (onProgress) onProgress(100);
+      return fallback;
+    }
+
+    // Extract Text from Image via Tesseract.js OCR with 8s timeout protection
+    async function extractTextFromImage(file, onProgress) {
+      if (onProgress) onProgress(10);
+      if (!window.Tesseract) {
+        throw new Error('OCR library unavailable offline. Please paste codes or use PDF.');
+      }
+      const ocrPromise = Tesseract.recognize(file, 'eng', {
+        logger: (m) => {
+          if (m.status === 'recognizing text' && onProgress) {
+            onProgress(Math.min(95, Math.max(15, Math.round(m.progress * 100))));
+          }
+        },
+      });
+      const result = await withTimeout(ocrPromise, 12000, 'Image OCR');
+      if (onProgress) onProgress(100);
+      return result.data.text || '';
+    }
+
+    // Extract Text from CSV / XLSX File via SheetJS or plain text
+    async function extractTextFromSpreadsheet(file, onProgress) {
+      if (onProgress) onProgress(25);
+      if (file.name.toLowerCase().endsWith('.csv') || file.name.toLowerCase().endsWith('.txt')) {
+        const text = await file.text();
+        if (onProgress) onProgress(100);
+        return text;
+      }
+      if (window.XLSX) {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        let combinedText = '';
+        workbook.SheetNames.forEach((sheetName) => {
+          const sheet = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+          rows.forEach((row) => {
+            const line = row.map((cell) => String(cell).trim()).filter(Boolean).join(' | ');
+            if (line) combinedText += line + '\n';
+          });
+        });
+        if (onProgress) onProgress(100);
+        return combinedText;
+      }
+      throw new Error('Excel parser unavailable. Please upload CSV or PDF.');
+    }
+
+    // Match Registered Course Codes against General Timetable Slots
+    function recomputeMatchedSchedule() {
+      const regSet = new Set(state.registeredCodes.map((c) => normalizeCourseCode(c)));
+      const matched = [];
+      const foundCodesSet = new Set();
+
+      state.generalSlots.forEach((slot, idx) => {
+        const normSlotCode = normalizeCourseCode(slot.code || slot.rawCode);
+        if (regSet.has(normSlotCode)) {
+          foundCodesSet.add(normSlotCode);
+          matched.push({
+            id: `slot-${idx}-${normSlotCode}`,
+            date: slot.date,
+            session: slot.session,
+            code: slot.rawCode || normSlotCode,
+            normCode: normSlotCode,
+            sortKey: slot.sortKey || computeSortKey(slot.date, slot.session),
+          });
         }
       });
 
-      document.getElementById('btn-clear-codes').addEventListener('click', () => {
-        state.registeredCodes = [];
-        state.matchedRows = [];
-        renderCodePills();
-        renderPersonalizedTable();
+      matched.sort((a, b) => a.sortKey - b.sortKey);
+
+      state.matchedSchedule = matched;
+      state.missingCodes =
+        state.generalSlots.length > 0
+          ? state.registeredCodes.filter((c) => !foundCodesSet.has(normalizeCourseCode(c)))
+          : [];
+
+      renderAll();
+    }
+
+    // Render Extracted Course Code Pills
+    function renderExtractedCodes() {
+      const count = state.registeredCodes.length;
+      el.extractedCount.textContent = count;
+      el.tabCodesBadge.textContent = count;
+
+      if (count === 0) {
+        el.btnClearCodes.classList.add('hidden');
+        el.extractedCodesContainer.innerHTML = `
+          <p class="text-sm text-slate-500 italic">
+            No course codes yet. Upload your exam slip or tap "Sample Slip".
+          </p>
+        `;
+        return;
+      }
+
+      el.btnClearCodes.classList.remove('hidden');
+      el.extractedCodesContainer.innerHTML = state.registeredCodes
+        .map(
+          (code) => `
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-900 font-mono font-extrabold text-sm sm:text-base shadow-2xs">
+            <span>${escapeHtml(code)}</span>
+            <button
+              type="button"
+              data-remove-code="${escapeHtml(code)}"
+              aria-label="Remove ${escapeHtml(code)}"
+              class="w-5 h-5 rounded-md bg-indigo-200/80 hover:bg-rose-500 hover:text-white text-indigo-800 flex items-center justify-center text-base leading-none transition cursor-pointer"
+            >
+              &times;
+            </button>
+          </span>
+        `
+        )
+        .join('');
+    }
+
+    // Render Alerts (Missing Courses & Time Clashes)
+    function renderAlerts(clashKeys) {
+      if (state.missingCodes.length > 0 && state.generalSlots.length > 0) {
+        el.missingCoursesAlert.classList.remove('hidden');
+        el.missingCoursesList.textContent = state.missingCodes.join(', ');
+      } else {
+        el.missingCoursesAlert.classList.add('hidden');
+      }
+
+      if (clashKeys.size > 0) {
+        el.clashAlert.classList.remove('hidden');
+      } else {
+        el.clashAlert.classList.add('hidden');
+      }
+    }
+
+    // Render Personalized Timetable Table (4 Data Columns + Edit Button; Zero Venue)
+    function renderTimetableTable() {
+      el.parsedSlotsCount.textContent = state.generalSlots.length;
+      const count = state.matchedSchedule.length;
+      el.previewExamCountBadge.textContent = `${count} ${count === 1 ? 'Exam' : 'Exams'}`;
+      el.tabExamsBadge.textContent = count;
+
+      // Mobile quick-jump CTA visibility
+      if (count > 0) {
+        el.btnMobileViewPreview.classList.remove('hidden');
+        el.btnMobileViewPreviewLabel.textContent = `View Timetable Preview (${count} ${count === 1 ? 'Exam' : 'Exams'})`;
+      } else {
+        el.btnMobileViewPreview.classList.add('hidden');
+      }
+
+      // Detect Clashes (same Date + same Session)
+      const slotCounts = new Map();
+      state.matchedSchedule.forEach((item) => {
+        const key = `${item.date.toLowerCase().trim()}|${item.session.toLowerCase().trim()}`;
+        slotCounts.set(key, (slotCounts.get(key) || 0) + 1);
       });
 
-      // Re-parse general timetable text on input change
-      document.getElementById('raw-timetable-text').addEventListener('input', (e) => {
-        parseGeneralTimetableText(e.target.value);
-      });
+      const clashKeys = new Set();
+      for (const [k, v] of slotCounts.entries()) {
+        if (v > 1) clashKeys.add(k);
+      }
 
-      // Refresh preview button
-      document.getElementById('btn-generate').addEventListener('click', () => {
-        const raw = document.getElementById('raw-timetable-text').value;
-        parseGeneralTimetableText(raw);
-        runMatchingEngine();
-        if (window.innerWidth < 1024 && state.matchedRows.length > 0) {
-          switchMobileView('preview');
+      renderAlerts(clashKeys);
+
+      if (count === 0) {
+        el.scheduleTableBody.innerHTML = `
+          <tr>
+            <td colspan="5" class="py-10 px-4 text-center">
+              <div class="max-w-md mx-auto space-y-2.5">
+                <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <p class="text-lg font-extrabold text-slate-900">
+                  Your live JPG preview appears here automatically
+                </p>
+                <p class="text-sm sm:text-base text-slate-600">
+                  Upload your Exam Slip &amp; General Timetable, or tap
+                  <strong class="text-amber-600">Instant Demo</strong> in the top bar.
+                </p>
+              </div>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      el.scheduleTableBody.innerHTML = state.matchedSchedule
+        .map((item, idx) => {
+          const clashKey = `${item.date.toLowerCase().trim()}|${item.session.toLowerCase().trim()}`;
+          const isClash = clashKeys.has(clashKey);
+          const rowBg = isClash
+            ? 'bg-rose-50/90 hover:bg-rose-100/80'
+            : idx % 2 === 1
+            ? 'bg-slate-50/80 hover:bg-indigo-50/40'
+            : 'bg-white hover:bg-indigo-50/40';
+
+          return `
+            <tr class="${rowBg} transition">
+              <td class="py-2.5 px-3 font-mono font-bold text-slate-500 text-sm sm:text-base">${idx + 1}</td>
+              <td class="py-2.5 px-3 font-bold text-slate-900 text-sm sm:text-base">
+                ${escapeHtml(item.date)}
+                ${
+                  isClash
+                    ? '<span class="ml-1.5 inline-block px-2 py-0.5 rounded-md bg-rose-600 text-white text-xs font-extrabold uppercase tracking-wide">CLASH</span>'
+                    : ''
+                }
+              </td>
+              <td class="py-2.5 px-3">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-lg font-mono font-bold text-sm sm:text-base bg-indigo-50 text-indigo-800 border border-indigo-200">
+                  ${escapeHtml(item.session)}
+                </span>
+              </td>
+              <td class="py-2.5 px-3">
+                <span class="font-mono font-extrabold text-base sm:text-lg text-slate-900 tracking-wide">
+                  ${escapeHtml(item.code)}
+                </span>
+              </td>
+              <td class="py-2.5 px-3 text-right">
+                <button
+                  type="button"
+                  data-edit-index="${idx}"
+                  class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-700 font-bold text-sm border border-slate-300 hover:border-indigo-600 transition cursor-pointer"
+                >
+                  Edit
+                </button>
+              </td>
+            </tr>
+          `;
+        })
+        .join('');
+    }
+
+    function renderAll() {
+      renderExtractedCodes();
+      renderTimetableTable();
+    }
+
+    // Handle Exam Slip Upload
+    async function handleSlipFile(file) {
+      if (!file) return;
+      el.slipProgressContainer.classList.remove('hidden');
+      el.slipProgressText.textContent = `Scanning ${file.name}...`;
+      el.slipProgressPercent.textContent = '5%';
+      el.slipProgressBar.style.width = '5%';
+
+      try {
+        let extractedText = '';
+        const name = file.name.toLowerCase();
+        const onProg = (pct) => {
+          el.slipProgressPercent.textContent = `${pct}%`;
+          el.slipProgressBar.style.width = `${pct}%`;
+        };
+
+        if (name.endsWith('.pdf') || file.type === 'application/pdf') {
+          extractedText = await extractTextFromPdf(file, onProg);
+        } else {
+          extractedText = await extractTextFromImage(file, onProg);
         }
-      });
 
-      // Sample buttons
-      document.getElementById('btn-sample-slip').addEventListener('click', loadSampleSlip);
-      document.getElementById('btn-sample-timetable').addEventListener('click', loadSampleTimetable);
-      document.getElementById('btn-load-both-samples').addEventListener('click', () => {
-        loadSampleSlip();
-        loadSampleTimetable();
-        runMatchingEngine();
-        if (window.innerWidth < 1024) {
-          switchMobileView('preview');
+        const codes = extractCourseCodesFromText(extractedText);
+        if (codes.length === 0) {
+          showToast('No course codes detected. Try typing codes or using Sample Slip.', 'warning');
+        } else {
+          const merged = new Set([...state.registeredCodes, ...codes]);
+          state.registeredCodes = Array.from(merged);
+          recomputeMatchedSchedule();
+          showToast(`Extracted ${codes.length} course codes from exam slip!`);
         }
+      } catch (err) {
+        console.error(err);
+        showToast(err.message || 'Could not scan exam slip. Try pasting codes manually.', 'error');
+      } finally {
+        setTimeout(() => {
+          el.slipProgressContainer.classList.add('hidden');
+          el.slipFileInput.value = '';
+        }, 600);
+      }
+    }
+
+    // Handle General Timetable Upload
+    async function handleTimetableFile(file) {
+      if (!file) return;
+      el.timetableProgressContainer.classList.remove('hidden');
+      el.timetableProgressText.textContent = `Parsing ${file.name}...`;
+      el.timetableProgressPercent.textContent = '5%';
+      el.timetableProgressBar.style.width = '5%';
+
+      try {
+        let extractedText = '';
+        const name = file.name.toLowerCase();
+        const onProg = (pct) => {
+          el.timetableProgressPercent.textContent = `${pct}%`;
+          el.timetableProgressBar.style.width = `${pct}%`;
+        };
+
+        if (name.endsWith('.pdf') || file.type === 'application/pdf') {
+          extractedText = await extractTextFromPdf(file, onProg);
+        } else if (
+          name.endsWith('.csv') ||
+          name.endsWith('.xlsx') ||
+          name.endsWith('.xls') ||
+          name.endsWith('.txt')
+        ) {
+          extractedText = await extractTextFromSpreadsheet(file, onProg);
+        } else {
+          extractedText = await extractTextFromImage(file, onProg);
+        }
+
+        const parsedSlots = parseTimetableText(extractedText);
+        if (parsedSlots.length === 0) {
+          showToast('Could not detect timetable slots. Try Paste Rows or Instant Demo.', 'warning');
+        } else {
+          state.generalSlots = parsedSlots;
+          recomputeMatchedSchedule();
+          showToast(`Parsed ${parsedSlots.length} exam slots from timetable!`);
+          if (state.matchedSchedule.length > 0 && window.innerWidth < 1024) {
+            setMobileTab('preview');
+          }
+        }
+      } catch (err) {
+        console.error(err);
+        showToast(err.message || 'Error parsing general timetable.', 'error');
+      } finally {
+        setTimeout(() => {
+          el.timetableProgressContainer.classList.add('hidden');
+          el.timetableFileInput.value = '';
+        }, 600);
+      }
+    }
+
+    // Add Manual Course Codes
+    function handleAddManualCodes() {
+      const raw = el.manualCodeInput.value.trim();
+      if (!raw) return;
+
+      let codes = extractCourseCodesFromText(raw);
+      if (codes.length === 0) {
+        codes = raw
+          .split(/[\s,;|\n]+/)
+          .map((s) => normalizeCourseCode(s))
+          .filter((s) => /^[A-Z0-9]{4,10}$/.test(s));
+      }
+
+      if (codes.length === 0) {
+        showToast('Enter valid course codes like CIT206, GST201', 'warning');
+        return;
+      }
+
+      const merged = new Set([...state.registeredCodes, ...codes]);
+      state.registeredCodes = Array.from(merged);
+      el.manualCodeInput.value = '';
+      recomputeMatchedSchedule();
+      showToast(`Added ${codes.length} course code${codes.length > 1 ? 's' : ''}`);
+    }
+
+    // Open Edit / Add Row Modal (Strictly No Venue)
+    function openEditModal(index) {
+      el.editRowIndex.value = String(index);
+      if (index === -1) {
+        el.editModalTitle.textContent = 'Add Exam Entry';
+        el.editDayDate.value = 'Wednesday, 18th November, 2026';
+        el.editSession.value = '8:30am';
+        el.editCourseCode.value = '';
+        el.btnDeleteEntry.classList.add('hidden');
+      } else {
+        const item = state.matchedSchedule[index];
+        if (!item) return;
+        el.editModalTitle.textContent = `Edit Entry #${index + 1}`;
+        el.editDayDate.value = item.date;
+        el.editSession.value = item.session;
+        el.editCourseCode.value = item.code;
+        el.btnDeleteEntry.classList.remove('hidden');
+      }
+      el.editModal.classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+      el.editModal.classList.add('hidden');
+    }
+
+    // Generate Crisp 2x Retina JPG on HTML5 Canvas (4 Columns: #, Day & Date, Session, Course Code)
+    function generateTimetableJpg() {
+      if (state.matchedSchedule.length === 0) {
+        showToast('Add courses & timetable first (or tap Instant Demo) before downloading.', 'warning');
+        return;
+      }
+
+      const titleText = (el.scheduleTitleInput.value.trim() || 'PERSONALIZED EXAM TIMETABLE').toUpperCase();
+      const subtitleText = el.scheduleSubtitleInput.value.trim() || '2026_2 Examination • Course Code Schedule';
+      const rows = state.matchedSchedule;
+
+      // Detect clashes for JPG badge
+      const slotCounts = new Map();
+      rows.forEach((item) => {
+        const key = `${item.date.toLowerCase().trim()}|${item.session.toLowerCase().trim()}`;
+        slotCounts.set(key, (slotCounts.get(key) || 0) + 1);
       });
 
-      // Reset all
-      document.getElementById('btn-reset-all').addEventListener('click', () => {
-        state.registeredCodes = [];
-        state.generalSlots = [];
-        state.matchedRows = [];
-        document.getElementById('raw-timetable-text').value = '';
-        document.getElementById('unmatched-alert').classList.add('hidden');
-        document.getElementById('clash-alert').classList.add('hidden');
-        renderCodePills();
-        renderPersonalizedTable();
-        updateCounters();
-        switchInputTab('slip');
-        showToast('Workspace reset.', 'info');
+      const scale = 2; // 2x Retina crisp output
+      const width = 1080;
+      const paddingX = 48;
+      const headerHeight = 148;
+      const tableHeaderHeight = 58;
+      const rowHeight = 64;
+      const footerHeight = 68;
+      const totalHeight = headerHeight + tableHeaderHeight + rows.length * rowHeight + footerHeight;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width * scale;
+      canvas.height = totalHeight * scale;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(scale, scale);
+
+      // Solid white background (essential for JPEG so there is zero black transparency)
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, totalHeight);
+
+      // Top Dark Navy Gradient Banner
+      const grad = ctx.createLinearGradient(0, 0, width, 0);
+      grad.addColorStop(0, '#0f172a');
+      grad.addColorStop(0.5, '#1e1b4b');
+      grad.addColorStop(1, '#0f172a');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, width, headerHeight);
+
+      // Header Title
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '800 32px Inter, system-ui, sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(titleText, paddingX, 54);
+
+      // Header Subtitle
+      ctx.fillStyle = '#c7d2fe';
+      ctx.font = '600 19px Inter, system-ui, sans-serif';
+      ctx.fillText(subtitleText, paddingX, 98);
+
+      // Right Exam Count Pill in Banner
+      const badgeLabel = `${rows.length} ${rows.length === 1 ? 'EXAM' : 'EXAMS'}`;
+      ctx.font = '800 18px Inter, system-ui, sans-serif';
+      const badgeW = ctx.measureText(badgeLabel).width + 36;
+      const badgeX = width - paddingX - badgeW;
+      ctx.fillStyle = 'rgba(99, 102, 241, 0.35)';
+      roundRect(ctx, badgeX, 46, badgeW, 44, 12);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(165, 180, 252, 0.45)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(badgeLabel, badgeX + 18, 68);
+
+      // Table Column Header Bar
+      const thY = headerHeight;
+      ctx.fillStyle = '#f1f5f9';
+      ctx.fillRect(0, thY, width, tableHeaderHeight);
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, thY + tableHeaderHeight);
+      ctx.lineTo(width, thY + tableHeaderHeight);
+      ctx.stroke();
+
+      // Column X Positions (4 clean columns: #, Day & Date, Session, Course Code)
+      const col1X = paddingX;        // #
+      const col2X = paddingX + 75;   // Day & Date
+      const col3X = paddingX + 550;  // Session
+      const col4X = paddingX + 785;  // Course Code
+
+      ctx.fillStyle = '#1e293b';
+      ctx.font = '800 18px Inter, system-ui, sans-serif';
+      const thMidY = thY + tableHeaderHeight / 2;
+      ctx.fillText('#', col1X, thMidY);
+      ctx.fillText('DAY & DATE', col2X, thMidY);
+      ctx.fillText('SESSION', col3X, thMidY);
+      ctx.fillText('COURSE CODE', col4X, thMidY);
+
+      // Draw Rows
+      rows.forEach((item, idx) => {
+        const y = headerHeight + tableHeaderHeight + idx * rowHeight;
+        const midY = y + rowHeight / 2;
+        const clashKey = `${item.date.toLowerCase().trim()}|${item.session.toLowerCase().trim()}`;
+        const isClash = (slotCounts.get(clashKey) || 0) > 1;
+
+        // Row Background
+        if (isClash) {
+          ctx.fillStyle = '#fff1f2';
+        } else if (idx % 2 === 1) {
+          ctx.fillStyle = '#f8fafc';
+        } else {
+          ctx.fillStyle = '#ffffff';
+        }
+        ctx.fillRect(0, y, width, rowHeight);
+
+        // Row Divider
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, y + rowHeight);
+        ctx.lineTo(width, y + rowHeight);
+        ctx.stroke();
+
+        // Col 1: Row Number
+        ctx.fillStyle = '#64748b';
+        ctx.font = '700 19px "JetBrains Mono", monospace';
+        ctx.fillText(String(idx + 1), col1X, midY);
+
+        // Col 2: Day & Date
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '700 20px Inter, system-ui, sans-serif';
+        ctx.fillText(item.date, col2X, midY);
+
+        if (isClash) {
+          const dateW = ctx.measureText(item.date).width;
+          ctx.fillStyle = '#e11d48';
+          roundRect(ctx, col2X + dateW + 14, midY - 13, 76, 26, 6);
+          ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '800 13px Inter, system-ui, sans-serif';
+          ctx.fillText('CLASH', col2X + dateW + 27, midY);
+        }
+
+        // Col 3: Session Pill
+        ctx.font = '700 18px "JetBrains Mono", monospace';
+        const sessW = ctx.measureText(item.session).width + 26;
+        ctx.fillStyle = '#eef2ff';
+        roundRect(ctx, col3X, midY - 18, sessW, 36, 9);
+        ctx.fill();
+        ctx.strokeStyle = '#c7d2fe';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.fillStyle = '#3730a3';
+        ctx.fillText(item.session, col3X + 13, midY);
+
+        // Col 4: Course Code
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '800 23px "JetBrains Mono", monospace';
+        ctx.fillText(item.code, col4X, midY);
       });
 
-      // Title / Subtitle live binding
-      document.getElementById('export-title-input').addEventListener('input', (e) => {
-        document.getElementById('render-title').textContent = e.target.value || 'PERSONALIZED EXAM TIMETABLE';
-      });
-      document.getElementById('export-subtitle-input').addEventListener('input', (e) => {
-        document.getElementById('render-subtitle').textContent = e.target.value;
-      });
+      // Footer Bar
+      const footY = totalHeight - footerHeight;
+      ctx.fillStyle = '#f8fafc';
+      ctx.fillRect(0, footY, width, footerHeight);
+      ctx.strokeStyle = '#cbd5e1';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, footY);
+      ctx.lineTo(width, footY);
+      ctx.stroke();
 
-      // Toggle venue column
-      document.getElementById('toggle-venue-col').addEventListener('change', (e) => {
-        state.showVenue = e.target.checked;
-        applyVenueColumnVisibility();
-      });
+      ctx.fillStyle = '#475569';
+      ctx.font = '600 16px Inter, system-ui, sans-serif';
+      ctx.fillText('Generated with ExamSync Studio • Course-Code Only Schedule', paddingX, footY + footerHeight / 2);
 
-      // Theme buttons
-      document.querySelectorAll('.theme-btn').forEach((btn) => {
-        btn.addEventListener('click', () => applyCardTheme(btn.dataset.theme));
+      const dateStamp = new Date().toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
       });
+      const stampText = `Exported ${dateStamp}`;
+      const stampW = ctx.measureText(stampText).width;
+      ctx.fillStyle = '#64748b';
+      ctx.font = '600 16px "JetBrains Mono", monospace';
+      ctx.fillText(stampText, width - paddingX - stampW, footY + footerHeight / 2);
 
-      // Modal controls
-      document.getElementById('btn-add-row-modal').addEventListener('click', () => openEditRowModal(-1));
-      document.getElementById('btn-close-modal').addEventListener('click', () => {
-        document.getElementById('row-modal').classList.add('hidden');
-      });
-      document.getElementById('btn-cancel-modal').addEventListener('click', () => {
-        document.getElementById('row-modal').classList.add('hidden');
-      });
+      // Convert to JPEG DataURL and Blob
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.96);
+      state.lastExportedDataUrl = dataUrl;
 
-      // Download JPG button
-      document.getElementById('btn-download-jpg').addEventListener('click', downloadTimetableAsJPG);
+      canvas.toBlob(
+        (blob) => {
+          state.lastExportedBlob = blob;
+          const fileName = 'Personalized_Exam_Timetable.jpg';
+
+          // Trigger direct download via anchor click
+          try {
+            const url = blob ? URL.createObjectURL(blob) : dataUrl;
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+              document.body.removeChild(a);
+              if (blob) URL.revokeObjectURL(url);
+            }, 1500);
+          } catch (e) {
+            console.warn('Direct download blocked by sandbox, showing modal:', e);
+          }
+
+          // Open mobile/WebView friendly image preview & share modal
+          el.exportedJpgPreviewImg.src = dataUrl;
+          el.directJpgDownloadLink.href = dataUrl;
+          el.jpgExportModal.classList.remove('hidden');
+          showToast('JPG Timetable generated!');
+        },
+        'image/jpeg',
+        0.96
+      );
+    }
+
+    // Canvas Rounded Rectangle Helper
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    // Web Share API / Save Image handler for iOS & Android WebViews
+    async function handleShareOrSaveJpg() {
+      try {
+        if (state.lastExportedBlob && navigator.canShare && navigator.share) {
+          const file = new File([state.lastExportedBlob], 'Personalized_Exam_Timetable.jpg', {
+            type: 'image/jpeg',
+          });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: 'Personalized Exam Timetable',
+            });
+            return;
+          }
+        }
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
+        console.warn('Web Share fallback:', err);
+      }
+      // Fallback: trigger dataUrl anchor download
+      el.directJpgDownloadLink.click();
+      showToast('Press and hold the image to Save to Photos if download is restricted.', 'warning');
+    }
+
+    // Event Listeners
+    el.tabBtnSetup.addEventListener('click', () => setMobileTab('setup'));
+    el.tabBtnPreview.addEventListener('click', () => setMobileTab('preview'));
+    el.btnMobileViewPreview.addEventListener('click', () => setMobileTab('preview'));
+
+    el.slipFileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        handleSlipFile(e.target.files[0]);
+      }
     });
+
+    el.timetableFileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        handleTimetableFile(e.target.files[0]);
+      }
+    });
+
+    el.btnAddManualCode.addEventListener('click', handleAddManualCodes);
+    el.manualCodeInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleAddManualCodes();
+      }
+    });
+
+    el.extractedCodesContainer.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-remove-code]');
+      if (!btn) return;
+      const code = btn.getAttribute('data-remove-code');
+      state.registeredCodes = state.registeredCodes.filter((c) => c !== code);
+      recomputeMatchedSchedule();
+      showToast(`Removed ${code}`);
+    });
+
+    el.btnLoadSampleSlip.addEventListener('click', () => {
+      state.registeredCodes = [...SAMPLE_REGISTERED_CODES];
+      recomputeMatchedSchedule();
+      showToast('Loaded 9 sample registered courses!');
+    });
+
+    el.btnClearCodes.addEventListener('click', () => {
+      state.registeredCodes = [];
+      recomputeMatchedSchedule();
+      showToast('Cleared registered courses');
+    });
+
+    el.btnToggleRawPaste.addEventListener('click', () => {
+      el.rawPasteBox.classList.toggle('hidden');
+    });
+
+    el.btnParseRawText.addEventListener('click', () => {
+      const raw = el.rawTimetableTextarea.value.trim();
+      if (!raw) {
+        showToast('Paste timetable rows first', 'warning');
+        return;
+      }
+      const parsed = parseTimetableText(raw);
+      if (parsed.length === 0) {
+        showToast('No valid timetable rows found in pasted text', 'warning');
+        return;
+      }
+      state.generalSlots = parsed;
+      recomputeMatchedSchedule();
+      el.rawPasteBox.classList.add('hidden');
+      showToast(`Parsed ${parsed.length} slots from pasted text!`);
+      if (state.matchedSchedule.length > 0 && window.innerWidth < 1024) {
+        setMobileTab('preview');
+      }
+    });
+
+    el.btnInstantDemo.addEventListener('click', () => {
+      state.registeredCodes = [...SAMPLE_REGISTERED_CODES];
+      state.generalSlots = [...SAMPLE_GENERAL_SLOTS];
+      recomputeMatchedSchedule();
+      if (window.innerWidth < 1024) {
+        setMobileTab('preview');
+      }
+      showToast('Loaded NOUN Demo Slip + 2026_2 Timetable!');
+    });
+
+    el.btnResetAll.addEventListener('click', () => {
+      state.registeredCodes = [];
+      state.generalSlots = [];
+      state.matchedSchedule = [];
+      state.missingCodes = [];
+      el.rawTimetableTextarea.value = '';
+      renderAll();
+      if (window.innerWidth < 1024) {
+        setMobileTab('setup');
+      }
+      showToast('Workspace cleared');
+    });
+
+    // Row Edit / Add Events
+    el.scheduleTableBody.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-edit-index]');
+      if (!btn) return;
+      const idx = parseInt(btn.getAttribute('data-edit-index'), 10);
+      openEditModal(idx);
+    });
+
+    el.btnAddCustomRow.addEventListener('click', () => openEditModal(-1));
+    el.btnCancelEdit.addEventListener('click', closeEditModal);
+    el.btnCloseEditModal.addEventListener('click', closeEditModal);
+
+    el.btnDeleteEntry.addEventListener('click', () => {
+      const idx = parseInt(el.editRowIndex.value, 10);
+      if (idx >= 0 && idx < state.matchedSchedule.length) {
+        const removed = state.matchedSchedule.splice(idx, 1)[0];
+        renderTimetableTable();
+        showToast(`Deleted ${removed.code}`);
+      }
+      closeEditModal();
+    });
+
+    el.editEntryForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const idx = parseInt(el.editRowIndex.value, 10);
+      const date = el.editDayDate.value.trim();
+      const session = el.editSession.value.trim();
+      const code = el.editCourseCode.value.trim().toUpperCase();
+      if (!date || !session || !code) return;
+
+      const entry = {
+        id: `custom-${Date.now()}`,
+        date,
+        session,
+        code,
+        normCode: normalizeCourseCode(code),
+        sortKey: computeSortKey(date, session),
+      };
+
+      if (idx === -1) {
+        state.matchedSchedule.push(entry);
+        showToast(`Added ${code}`);
+      } else if (idx >= 0 && idx < state.matchedSchedule.length) {
+        state.matchedSchedule[idx] = entry;
+        showToast(`Updated ${code}`);
+      }
+
+      state.matchedSchedule.sort((a, b) => a.sortKey - b.sortKey);
+      renderTimetableTable();
+      closeEditModal();
+    });
+
+    // Download & Export Modal Events
+    el.btnDownloadJpg.addEventListener('click', generateTimetableJpg);
+    el.btnHeaderDownloadJpg.addEventListener('click', generateTimetableJpg);
+    el.btnShareJpg.addEventListener('click', handleShareOrSaveJpg);
+    el.btnCloseJpgModal.addEventListener('click', () => el.jpgExportModal.classList.add('hidden'));
+    el.btnDoneJpgModal.addEventListener('click', () => el.jpgExportModal.classList.add('hidden'));
+
+    // Initialize Timestamp & Initial Render
+    el.previewGeneratedDate.textContent = new Date().toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+    renderAll();
   </script>
 </body>
 </html>
